@@ -32,10 +32,12 @@
 
 #include "svchax/svchax.h"
 #include "json/json.h"
+#include "SoundOperations/WavDecoder.hpp"
 
 static const u16 top = 0x140;
 static bool bSvcHaxAvailable = true;
 static bool bInstallMode = false;
+int selectedOption = -2;
 static std::string regionFilter = "off";
 
 std::string upper(std::string s)
@@ -525,7 +527,6 @@ void action_toggle_install()
 
 void action_toggle_region()
 {
-    consoleClear();
     if(regionFilter == "off") {
         regionFilter = "ALL";
     } else if (regionFilter == "ALL") {
@@ -553,7 +554,7 @@ void action_about()
 }
 
 /* Menu functions */
-void menu_main()
+void menu_main(bool refresh)
 {
     const char *options[] = {
         "Search for a title by name",
@@ -566,26 +567,37 @@ void menu_main()
     };
     char footer[31];
 
-    while (true)
-    {
         // We have to update the footer every draw, incase the user switches install mode
         sprintf(footer, "%s Mode%s Region:%s", (bInstallMode ? "Install" : "Download"), (bInstallMode ? " (EXPERIMENTAL!)" : ""), regionFilter.c_str());
 
-        int result = menu_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options);
+        int result = menu_draw_nb("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, refresh);
+		if(result != -2) {
+			selectedOption = result;
+		}
+        clear_screen(GFX_BOTTOM);
+}
 
-        switch (result)
+bool runLoop() {
+        switch (selectedOption)
         {
+			case -1:
+				menu_main(false);
+				return true;
+			break;
             case 0:
                 action_search();
+					clear_screen(GFX_BOTTOM);
             break;
             case 1:
                 action_toggle_region();
             break;
             case 2:
                 action_manual_entry();
+    clear_screen(GFX_BOTTOM);
             break;
             case 3:
                 action_input_txt();
+    clear_screen(GFX_BOTTOM);
             break;
             case 4:
                 action_toggle_install();
@@ -594,14 +606,15 @@ void menu_main()
                 action_about();
             break;
             case 6:
-                return;
+                return false;
             break;
         }
-
-        clear_screen(GFX_BOTTOM);
-    }
+		menu_main(true);
+		std::string overlay = "Region: " + regionFilter;
+		menu_draw_string(overlay.c_str(), 30, 0, CONSOLE_GREEN CONSOLE_REVERSE);
+		selectedOption = -1;
+	return true;
 }
-
 int main(int argc, const char* argv[])
 {
     /* Sadly svchax crashes too much, so only allow install mode when running as a CIA
@@ -638,7 +651,22 @@ int main(int argc, const char* argv[])
     }
 
     init_menu(GFX_TOP);
-    menu_main();
+	while (aptMainLoop()) {
+		hidScanInput();
+		u32 kDown = hidKeysDown();
+
+		if (kDown & KEY_START) break; // break in order to return to hbmenu
+		if(kDown) {
+		}
+			if(!runLoop()) break;
+
+		// Flush and swap framebuffers
+		gfxFlushBuffers();
+		gfxSwapBuffers();
+
+		//Wait for VBlank
+		gspWaitForVBlank();
+	}
 
     if (bSvcHaxAvailable)
     {
