@@ -40,7 +40,8 @@ static const u16 top = 0x140;
 static bool bSvcHaxAvailable = true;
 enum install_modes {make_cia, install_direct, install_ticket};
 install_modes selected_mode = make_cia;
-
+int selectedOption = -2;
+static bool updateScreen = true;
 static std::string regionFilter = "off";
 
 std::string upper(std::string s)
@@ -563,7 +564,6 @@ void action_toggle_install()
 
 void action_toggle_region()
 {
-    consoleClear();
     if(regionFilter == "off") {
         regionFilter = "ALL";
     } else if (regionFilter == "ALL") {
@@ -587,12 +587,20 @@ void action_about()
     printf("Download, create, and install CIAs directly\n");
     printf("from Nintendo's CDN servers. Grabbing the\n");
     printf("latest games has never been so easy.\n");
+	setTextColor(0xFF0000FF);
+	renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
+	setTextColor(0xFFCCCCCC);
+    renderText(0, 32, 0.6f, 0.6f, false, "Download, create, and install CIAs directly\nfrom Nintendo's CDN servers. Grabbing the\nlatest games has never been so easy.\n");
+sceneDraw();
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
 /* Menu functions */
-void menu_main()
+void menu_main(bool refresh)
 {
+	if(!updateScreen) {
+		updateScreen = refresh;
+	}
     const char *options[] = {
         "Search for a title by name",
         "Enable region filter for search",
@@ -604,8 +612,6 @@ void menu_main()
     };
     char footer[42];
 
-    while (true)
-    {
         std::string mode_text;
         if(selected_mode == make_cia) {
             mode_text = "Create CIA";
@@ -620,21 +626,33 @@ void menu_main()
         // We have to update the footer every draw, incase the user switches install mode
         sprintf(footer, "Mode:%s Region:%s", mode_text.c_str(), regionFilter.c_str());
 
-        int result = menu_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options);
+        int result = menu_draw_nb("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, refresh);
+		if(result != -2) {
+			selectedOption = result;
+		}
+}
 
-        switch (result)
+bool runLoop() {
+        switch (selectedOption)
         {
+			case -1:
+				menu_main(false);
+				return true;
+			break;
             case 0:
                 action_search();
+					clear_screen(GFX_BOTTOM);
             break;
             case 1:
                 action_toggle_region();
             break;
             case 2:
                 action_manual_entry();
+    clear_screen(GFX_BOTTOM);
             break;
             case 3:
                 action_input_txt();
+    clear_screen(GFX_BOTTOM);
             break;
             case 4:
                 action_toggle_install();
@@ -643,14 +661,13 @@ void menu_main()
                 action_about();
             break;
             case 6:
-                return;
+                return false;
             break;
         }
-		sceneDraw();
-        clear_screen(GFX_BOTTOM);
-    }
+		menu_main(true);
+		selectedOption = -1;
+	return true;
 }
-
 int main(int argc, const char* argv[])
 {
     /* Sadly svchax crashes too much, so only allow install mode when running as a CIA
@@ -687,10 +704,29 @@ int main(int argc, const char* argv[])
     }
 	// Initialize the scene
 	sceneInit();
-	
-	sceneDraw();
+	sceneRender(1.0f);	
 	init_menu(GFX_BOTTOM);
-    menu_main();
+
+	while (aptMainLoop()) {
+		hidScanInput();
+		u32 kDown = hidKeysDown();
+
+		if (kDown & KEY_START) break; // break in order to return to hbmenu
+		if(kDown) {
+		}
+			if(!runLoop()) break;
+
+		// Flush and swap framebuffers
+		if(updateScreen) {
+			updateScreen = false;
+//			sceneDraw();
+			gfxFlushBuffers();
+			gfxSwapBuffers();
+		}
+		//Wait for VBlank
+		gspWaitForVBlank();
+	}
+
     if (bSvcHaxAvailable)
     {
         amExit();

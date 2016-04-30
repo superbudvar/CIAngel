@@ -130,8 +130,11 @@ static void addTextVertex(float vx, float vy, float tx, float ty)
 	vtx->texcoord[1] = ty;
 }
 void sceneRenderFooter(const char* text) {
-	setTextColor(0xFF00FF00); // black
-	renderText(0, TOP_SCREEN_HEIGHT-(8), FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, text);
+	setTextColor(0xFF0000FF); // red
+	renderText(16.0f, 210.0f, 0.5f, 0.75f, true, text);
+//	setTextColor(0xFF00FF00); // black
+//	renderText(0, TOP_SCREEN_HEIGHT-(8), FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, text);
+sceneDraw();
 }
 void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char* text)
 {

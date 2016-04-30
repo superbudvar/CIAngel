@@ -9,6 +9,7 @@
 #include "display.h"
 
 int selected_options[MAX_SELECTED_OPTIONS];
+static int current = 0;
 
 ConsoleMenu currentMenu;
 
@@ -27,12 +28,13 @@ void menu_draw_string(const char* str, int pos_x, int pos_y, const char* color)
     currentMenu.menuConsole.cursorX = pos_x;
     currentMenu.menuConsole.cursorY = pos_y;
     printf("%s%s%s", color, str, CONSOLE_RESET);
-
-	setTextColor(0xFFFF0000); // black
-	renderText(pos_x*8, pos_y*8, FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, str);
-    gfxFlushBuffers();
 }
 
+void ui_menu_draw_string(const char* str, int pos_x, int pos_y, u32 color)
+{
+	setTextColor(color); // black
+	renderText(pos_x, pos_y, FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, str);
+}
 void menu_draw_string_full(const char* str, int pos_y, const char* color)
 {
     currentMenu.menuConsole.cursorX = 0;
@@ -49,9 +51,95 @@ void menu_draw_string_full(const char* str, int pos_y, const char* color)
     }
     printf(CONSOLE_RESET);
 
-    gfxFlushBuffers();
 }
 
+void ui_menu_draw(const char *title, const char* footer, int back, int count, const char *options[]) {
+	setTextColor(0xFF00FF00);
+	renderText(0, 8, 0.7f, 0.7f, false, title);
+	for (int i = 0; i < count; i++) {
+		ui_menu_draw_string(options[i], 1, 32+(i*12), i==current? 0xFF0000FF: 0xFF000000);
+	}
+	if (footer != NULL)
+	{
+		sceneRenderFooter(footer);
+	}
+}
+int menu_draw_nb(const char *title, const char* footer, int back, int count, const char *options[], bool forceRefresh)
+{
+    int selected = -2;
+	u32 key = hidKeysDown();
+	
+	if(forceRefresh || key) {
+		// Select our menu console and clear the screen
+		PrintConsole* currentConsole = consoleSelect(&currentMenu.menuConsole);
+		if(forceRefresh) {
+			consoleClear();
+		}
+
+	   // int current = 0;
+		int pos_y_text[count];
+		int current_pos_y = 0;
+		int from_option = current;
+		int to_option = 0;
+		// Draw the header
+		menu_draw_string(title, 0, current_pos_y++, CONSOLE_RED);
+
+		// Draw the menu
+		pos_y_text[0] = current_pos_y;
+		//menu_draw_string(options[0], 1, current_pos_y++, CONSOLE_REVERSE);
+		// Don't allow the menu to draw beyond the edge of the screen, just truncate if so
+		for (int i = 0; i < count && i < (currentMenu.menuConsole.consoleHeight - 2); i++) {
+			pos_y_text[i] = current_pos_y;
+			menu_draw_string(options[i], 1, current_pos_y++, CONSOLE_WHITE);
+		}
+
+		// Draw the footer if one is provided
+		if (footer != NULL)
+		{
+			current_pos_y = currentMenu.menuConsole.consoleHeight - 1;
+			menu_draw_string_full(footer, current_pos_y, CONSOLE_BLUE CONSOLE_REVERSE);
+		}
+
+			
+		if (key & KEY_UP) {
+
+			if (current <= 0) {
+				current = count - 1;
+			} else {
+				current--;
+			}
+		} else if (key & KEY_DOWN) {
+
+			if (current >= count - 1) {
+				current = 0;
+			} else {
+				current++;
+			}
+
+		} else if (key & KEY_RIGHT) {
+
+			current += 5;
+			if (current >= count) current = count - 1;
+
+		} else if (key & KEY_LEFT) {
+			current -= 5;
+			if (current < 0) current = 0;
+
+		} else if (key & KEY_A) {
+			selected = current;
+		} else if ((key & KEY_B) && back) {
+			selected = -1;
+		}
+		if(forceRefresh || from_option != current) {
+			menu_draw_string(options[from_option], 1, pos_y_text[from_option], CONSOLE_WHITE);
+			menu_draw_string(options[current], 1, pos_y_text[current], CONSOLE_REVERSE);
+		}
+		ui_menu_draw(title, footer, back, count, options);
+		// Reselect the original console
+		consoleSelect(currentConsole);
+	}
+    return selected;
+}
 int menu_draw(const char *title, const char* footer, int back, int count, const char *options[])
 {
     int selected = 0;
@@ -60,7 +148,7 @@ int menu_draw(const char *title, const char* footer, int back, int count, const 
     PrintConsole* currentConsole = consoleSelect(&currentMenu.menuConsole);
     consoleClear();
 
-    int current = 0;
+   // int current = 0;
     int pos_y_text[count];
     int current_pos_y = 0;
 
@@ -76,6 +164,7 @@ int menu_draw(const char *title, const char* footer, int back, int count, const 
     for (int i = 1; i < count && i < (currentMenu.menuConsole.consoleHeight - 2); i++) {
         pos_y_text[i] = current_pos_y;
         menu_draw_string(options[i], 1, current_pos_y++, CONSOLE_WHITE);
+	ui_menu_draw_string(options[i], 1, 5+(i*12), i==current? 0xFF0000FF: 0xFF000000);
     }
 
     // Draw the footer if one is provided
@@ -130,7 +219,7 @@ int menu_draw(const char *title, const char* footer, int back, int count, const 
             selected = -1;
             break;
         }
-		sceneDraw();	
+	sceneDraw();	
     }
     // Reselect the original console
     consoleSelect(currentConsole);
