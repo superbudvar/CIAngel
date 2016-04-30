@@ -24,6 +24,9 @@
 #include <hbkb.h>
 
 #include <3ds.h>
+#include <citro3d.h>
+#include "vshader_shbin.h"
+#include "display.h"
 
 #include "utils.h"
 #include "cia.h"
@@ -643,7 +646,7 @@ void menu_main()
                 return;
             break;
         }
-
+		sceneDraw();
         clear_screen(GFX_BOTTOM);
     }
 }
@@ -669,7 +672,7 @@ int main(int argc, const char* argv[])
 
     u32 *soc_sharedmem, soc_sharedmem_size = 0x100000;
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    consoleInit(GFX_BOTTOM, NULL);
 
     httpcInit(0);
     soc_sharedmem = (u32 *)memalign(0x1000, soc_sharedmem_size);
@@ -682,15 +685,19 @@ int main(int argc, const char* argv[])
         amInit();
         AM_InitializeExternalTitleDatabase(false);
     }
-
-    init_menu(GFX_TOP);
+	// Initialize the scene
+	sceneInit();
+	
+	sceneDraw();
+	init_menu(GFX_BOTTOM);
     menu_main();
-
     if (bSvcHaxAvailable)
     {
         amExit();
     }
 
+	sceneExit();
+	C3D_Fini();
     gfxExit();
     hidExit();
     httpcExit();

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "utils.h"
+#include "display.h"
 
 int selected_options[MAX_SELECTED_OPTIONS];
 
@@ -27,6 +28,8 @@ void menu_draw_string(const char* str, int pos_x, int pos_y, const char* color)
     currentMenu.menuConsole.cursorY = pos_y;
     printf("%s%s%s", color, str, CONSOLE_RESET);
 
+	setTextColor(0xFFFF0000); // black
+	renderText(pos_x*8, pos_y*8, FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, str);
     gfxFlushBuffers();
 }
 
@@ -62,6 +65,8 @@ int menu_draw(const char *title, const char* footer, int back, int count, const 
     int current_pos_y = 0;
 
     // Draw the header
+	setTextColor(0xFFFF0000);
+	renderText(0, current_pos_y*8, 1.0f, 1.0f, false, title);
     menu_draw_string(title, 0, current_pos_y++, CONSOLE_RED);
 
     // Draw the menu
@@ -78,6 +83,7 @@ int menu_draw(const char *title, const char* footer, int back, int count, const 
     {
         current_pos_y = currentMenu.menuConsole.consoleHeight - 1;
         menu_draw_string_full(footer, current_pos_y, CONSOLE_BLUE CONSOLE_REVERSE);
+		sceneRenderFooter(footer);
     }
 
     while (true) {
@@ -124,8 +130,8 @@ int menu_draw(const char *title, const char* footer, int back, int count, const 
             selected = -1;
             break;
         }
+		sceneDraw();	
     }
-
     // Reselect the original console
     consoleSelect(currentConsole);
     return selected;
