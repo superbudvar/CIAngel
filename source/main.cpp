@@ -254,10 +254,13 @@ Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string o
 
 std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
 {
+gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
+    clear_screen(GFX_BOTTOM);
     sHBKB->HBKB_Clean();
     touchPosition touch;
     u8 KBState = 4;
     std::string input;
+    std::string last_input;
     while (KBState != 1 || input.length() == 0)
     {
         hidScanInput();
@@ -274,18 +277,22 @@ std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
         // Otherwise if the user has entered a key
         else if (KBState != 4)
         {
-            printf("%c[2K\r", 27);
-            printf("%s", input.c_str());
+		if(strcmp(last_input.c_str(),input.c_str()) != 0) {
+			ui_menu_draw_string(input.c_str(), 10, 10, 0xFFCCCCCC);
+			sceneDraw();
+			last_input = input;
+		}
         }
 
         // Flush and swap framebuffers
-        gfxFlushBuffers();
+/*        gfxFlushBuffers();
         gfxSwapBuffers();
-
+*/
         //Wait for VBlank
         gspWaitForVBlank();
     }
-    printf("\n");
+	gfxSetScreenFormat(GFX_BOTTOM, GSP_RGB565_OES);
+    clear_screen(GFX_BOTTOM);
     return input;
 }
 
@@ -377,6 +384,7 @@ void action_search()
 
     consoleClear();
 
+    clear_screen(GFX_BOTTOM);
     printf("Please enter text to search for:\n");
     std::string searchstring = getInput(&sHBKB, bKBCancelled);
     if (bKBCancelled)
