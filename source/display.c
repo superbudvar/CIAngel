@@ -134,7 +134,7 @@ void sceneRenderFooter(const char* text) {
 	renderText(16.0f, 210.0f, 0.5f, 0.75f, true, text);
 //	setTextColor(0xFF00FF00); // black
 //	renderText(0, TOP_SCREEN_HEIGHT-(8), FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, text);
-sceneDraw();
+	sceneDraw();
 }
 void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char* text)
 {

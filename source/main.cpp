@@ -41,8 +41,11 @@ static bool bSvcHaxAvailable = true;
 enum install_modes {make_cia, install_direct, install_ticket};
 install_modes selected_mode = make_cia;
 int selectedOption = -2;
+int sub_menu_stage = 0;
 static bool updateScreen = true;
 static std::string regionFilter = "off";
+u32 kDown;
+std::stack<int> currentSelection;
 
 std::string upper(std::string s)
 {
@@ -254,7 +257,8 @@ Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string o
 
 std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
 {
-gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
+    GSPGPU_FramebufferFormats format = gfxGetScreenFormat(GFX_BOTTOM);
+    gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
     clear_screen(GFX_BOTTOM);
     sHBKB->HBKB_Clean();
     touchPosition touch;
@@ -272,26 +276,27 @@ gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
         if (KBState == 3)
         {
             bCancelled = true;
+            input = "";
             break;
         }
         // Otherwise if the user has entered a key
         else if (KBState != 4)
         {
-		if(strcmp(last_input.c_str(),input.c_str()) != 0) {
-			ui_menu_draw_string(input.c_str(), 10, 10, 0xFFCCCCCC);
-			sceneDraw();
-			last_input = input;
-		}
+            if(strcmp(last_input.c_str(),input.c_str()) != 0) {
+                ui_menu_draw_string(input.c_str(), 10, 10, COLOR_SELECTED);
+                sceneDraw();
+                last_input = input;
+                // Flush and swap framebuffers
+                gfxFlushBuffers();
+                gfxSwapBuffers();
+            }
         }
 
-        // Flush and swap framebuffers
-/*        gfxFlushBuffers();
-        gfxSwapBuffers();
-*/
+
         //Wait for VBlank
         gspWaitForVBlank();
     }
-	gfxSetScreenFormat(GFX_BOTTOM, GSP_RGB565_OES);
+    gfxSetScreenFormat(GFX_BOTTOM, format);
     clear_screen(GFX_BOTTOM);
     return input;
 }
@@ -379,119 +384,157 @@ int levenshtein_distance(const std::string &s1, const std::string &s2)
 /* Menu Action Functions */
 void action_search()
 {
-    HB_Keyboard sHBKB;
-    bool bKBCancelled = false;
-
     consoleClear();
-
-    clear_screen(GFX_BOTTOM);
-    printf("Please enter text to search for:\n");
-    std::string searchstring = getInput(&sHBKB, bKBCancelled);
-    if (bKBCancelled)
-    {
-        return;
-    }
-
-    // User has entered their input, so let's scrap the keyboard
-    clear_screen(GFX_BOTTOM);
-
+    printf("Loading json\n");
+    HB_Keyboard sHBKB;
+    std::string searchstring;
+    std::string mode_text;
     std::vector<display_item> display_output;
+    int result = -2; // Set as unselected
+    int displayCount = 0;
+    bool bKBCancelled = false;
+    bool refresh = true;
+    bool finished = false;
+    // We technically have 30 rows to work with, minus 2 for header/footer. But stick with 20 entries for now
+    unsigned int display_amount = 20; 
+    char* results[100];
+    char footer[51];
+    // Set up the reading of json
     std::ifstream ifs("/CIAngel/wings.json");
     Json::Reader reader;
     Json::Value obj;
     reader.parse(ifs, obj);
     const Json::Value& characters = obj; // array of characters
-    for (unsigned int i = 0; i < characters.size(); i++){
-        std::string temp;
-        temp = characters[i]["name"].asString();
 
-        int ld = levenshtein_distance(upper(temp), upper(searchstring));
-    	if(temp.find("-System") == std::string::npos &&  (regionFilter == "off" || characters[i]["region"].asString() == regionFilter)) {
-    		if (ld < 10)
-    		{
-    		    display_item item;
-    		    item.ld = ld;
-    		    item.index = i;
-    		    display_output.push_back(item);
-    		}
-    	}
-    }
-
-    // sort similar names by levenshtein distance
-    std::sort(display_output.begin(), display_output.end(), compareByLD);
-
-    // We technically have 30 rows to work with, minus 2 for header/footer. But stick with 20 entries for now
-    unsigned int display_amount = 20; 
-    if ( display_output.size() < display_amount )
-    {
-        display_amount = display_output.size();
-    }
-
-    if (display_amount == 0)
-    {
-        printf("No matching titles found.\n");
-        wait_key_specific("\nPress A to return.\n", KEY_A);
-        return;
-    }
-
-    // Eh, allocated memory because we need to format the data
-    char* results[display_amount];
-    for (u8 i = 0; i < display_amount; i++)
-    {
-        results[i] = (char*)malloc(51 * sizeof(char));
-        sprintf(results[i], "%-30s (%s) %s",
-                characters[display_output[i].index]["name"].asString().c_str(),
-                characters[display_output[i].index]["region"].asString().c_str(),
-                characters[display_output[i].index]["code"].asString().c_str());
-    }
-
-    std::string mode_text;
-    if(selected_mode == make_cia) {
-        mode_text = "Create CIA";
-    } else if (selected_mode == install_direct) {
-        mode_text = "Install CIA";
-    } else if (selected_mode == install_ticket) {
-        mode_text = "Create Ticket";
-    }
-
-    char footer[51];
-    sprintf(footer, "Press A to %s. Press B to return.", mode_text.c_str());
-
-    int result = menu_draw("Select a Title", footer, 1, sizeof(results) / sizeof(char*), (const char**)results);
-
-    // Free our allocated memory
-    for (u8 i = 0; i < display_amount; i++)
-    {
-        free(results[i]);
-    }
-
-    if (result == -1)
-    {
-        return;
-    }
-
-    // Clean up the console since we'll be using it
     consoleClear();
+    clear_screen(GFX_BOTTOM);
+    while(!finished) {
+        hidScanInput();
+        kDown = hidKeysDown();
 
-    // Fetch the title data and start downloading
-    std::string selected_titleid = characters[display_output[result].index]["titleid"].asString();
-    std::string selected_enckey = characters[display_output[result].index]["enckey"].asString();
-    std::string selected_name = characters[display_output[result].index]["name"].asString();
+        if (kDown) {
+            refresh= true;
+            if(kDown & KEY_START) {
+                finished = true;
+                break; // break in order to return to hbmenu
+            }
+        }
+        if(sub_menu_stage == 0) {
+                // Get the search value
+                ui_menu_draw_string("Please enter text to search for:", 0, 0, COLOR_NEUTRAL);
+                searchstring = getInput(&sHBKB, bKBCancelled);
+                if (bKBCancelled) {
+                    if(searchstring.length() == 0)
+                    { 
+                        finished = true;
+                        sub_menu_stage = -1;
+                    }
+                }
+                sub_menu_stage++;
+        } else if(sub_menu_stage == 1) {
+                // Get Results
+                for (unsigned int i = 0; i < characters.size(); i++){
+                    std::string temp;
+                    temp = characters[i]["name"].asString();
 
-    printf("OK - %s\n", selected_name.c_str());
-    //removes any problem chars, not sure if whitespace is a problem too...?
-    removeForbiddenChar(&selected_name);
+                    int ld = levenshtein_distance(upper(temp), upper(searchstring));
+                    if(temp.find("-System") == std::string::npos &&  (regionFilter == "off" || characters[i]["region"].asString() == regionFilter)) {
+                        if (ld < 10)
+                        {
+                            display_item item;
+                            item.ld = ld;
+                            item.index = i;
+                            display_output.push_back(item);
+                        }
+                    }
+                }
 
-    if(selected_mode == install_ticket){
-        char empty_titleVersion[2] = {0x00, 0x00};
-        mkpath("/CIAngel/tickets/", 0777); 
-        CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tickets/" + selected_name + ".tik"); 
+                // sort similar names by levenshtein distance
+                std::sort(display_output.begin(), display_output.end(), compareByLD);
+                displayCount = display_amount;
+                if ( display_output.size() < display_amount )
+                {
+                    displayCount = display_output.size();
+                }
+
+                if (displayCount == 0)
+                {
+                    printf("No matching titles found.\n");
+                    wait_key_specific("\nPress A to return.\n", KEY_A);
+                    sub_menu_stage = 0;
+                    finished = true;
+                } else {
+                    // Eh, allocated memory because we need to format the data
+                    for (u8 i = 0; i < displayCount; i++)
+                    {
+                        results[i] = (char*)malloc(51 * sizeof(char));
+                        sprintf(results[i], "%-30s (%s) %s",
+                        characters[display_output[i].index]["name"].asString().c_str(),
+                        characters[display_output[i].index]["region"].asString().c_str(),
+                        characters[display_output[i].index]["code"].asString().c_str());
+                    }
+                    sub_menu_stage++;
+                }
+        } else if(sub_menu_stage == 2) {
+                if(selected_mode == make_cia) {
+                    mode_text = "Create CIA";
+                } else if (selected_mode == install_direct) {
+                    mode_text = "Install CIA";
+                } else if (selected_mode == install_ticket) {
+                    mode_text = "Create Ticket";
+                }
+
+                sprintf(footer, "Press A to %s. Press B to return.", mode_text.c_str());
+                result = -2;
+                refresh = true;
+                result = menu_draw_list("Select a Title", footer, 1, displayCount, (const char**)results, refresh);
+                if(result < 0) {
+                    if (result == -1)
+                    {
+                        // Free our allocated memory
+                        for (u8 i = 0; i < displayCount; i++)
+                        {
+                            free(results[i]);
+                        }
+                        finished = true;
+                        sub_menu_stage = 0;
+                    }
+                } else {
+                    sub_menu_stage++;
+                    // Clean up the console since we'll be using it
+                    consoleClear();
+                    sceneDraw();
+                }
+        } else if(sub_menu_stage == 3) {
+                // Fetch the title data and start downloading
+                std::string selected_titleid = characters[display_output[result].index]["titleid"].asString();
+                std::string selected_enckey = characters[display_output[result].index]["enckey"].asString();
+                std::string selected_name = characters[display_output[result].index]["name"].asString();
+
+                printf("OK - %s\n", selected_name.c_str());
+                //removes any problem chars, not sure if whitespace is a problem too...?
+                removeForbiddenChar(&selected_name);
+
+                if(selected_mode == install_ticket){
+                    char empty_titleVersion[2] = {0x00, 0x00};
+                    mkpath("/CIAngel/tickets/", 0777); 
+                    CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tickets/" + selected_name + ".tik"); 
+                }
+                else{
+                    DownloadTitle(selected_titleid, selected_enckey, "/CIAngel/" + selected_name);
+                }
+
+                wait_key_specific("\nPress A to continue.\n", KEY_A);
+                sub_menu_stage=0;
+                selectedOption = -1;
+                finished = true;
+        }
+        if(refresh) {
+            sceneDraw();
+            refresh=false;
+        }
+        gspWaitForVBlank();
     }
-    else{
-        DownloadTitle(selected_titleid, selected_enckey, "/CIAngel/" + selected_name);
-    }
-
-    wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
 void action_manual_entry()
@@ -595,9 +638,9 @@ void action_about()
     printf("Download, create, and install CIAs directly\n");
     printf("from Nintendo's CDN servers. Grabbing the\n");
     printf("latest games has never been so easy.\n");
-	setTextColor(0xFF0000FF);
-	renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
-	setTextColor(0xFFCCCCCC);
+    setTextColor(0xFF0000FF);
+    renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
+    setTextColor(0xFFCCCCCC);
     renderText(0, 32, 0.6f, 0.6f, false, "Download, create, and install CIAs directly\nfrom Nintendo's CDN servers. Grabbing the\nlatest games has never been so easy.\n");
 sceneDraw();
     wait_key_specific("\nPress A to continue.\n", KEY_A);
@@ -606,9 +649,10 @@ sceneDraw();
 /* Menu functions */
 void menu_main(bool refresh)
 {
-	if(!updateScreen) {
-		updateScreen = refresh;
-	}
+    std::string mode_text;
+    if(!updateScreen) {
+        updateScreen = refresh;
+    }
     const char *options[] = {
         "Search for a title by name",
         "Enable region filter for search",
@@ -620,7 +664,6 @@ void menu_main(bool refresh)
     };
     char footer[42];
 
-        std::string mode_text;
         if(selected_mode == make_cia) {
             mode_text = "Create CIA";
         }
@@ -635,21 +678,24 @@ void menu_main(bool refresh)
         sprintf(footer, "Mode:%s Region:%s", mode_text.c_str(), regionFilter.c_str());
 
         int result = menu_draw_nb("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, refresh);
-		if(result != -2) {
-			selectedOption = result;
-		}
+        if(result != -2) {
+            selectedOption = result;
+        }
 }
 
 bool runLoop() {
         switch (selectedOption)
         {
-			case -1:
-				menu_main(false);
-				return true;
-			break;
+            case -1:
+                menu_main(false);
+                return true;
+            break;
             case 0:
+                if(currentSelection.size() == 0) {
+                    currentSelection.push(-2);
+                }
                 action_search();
-					clear_screen(GFX_BOTTOM);
+                currentSelection.pop();
             break;
             case 1:
                 action_toggle_region();
@@ -672,9 +718,9 @@ bool runLoop() {
                 return false;
             break;
         }
-		menu_main(true);
-		selectedOption = -1;
-	return true;
+        menu_main(true);
+        selectedOption = -1;
+    return true;
 }
 int main(int argc, const char* argv[])
 {
@@ -710,38 +756,39 @@ int main(int argc, const char* argv[])
         amInit();
         AM_InitializeExternalTitleDatabase(false);
     }
-	// Initialize the scene
-	sceneInit();
-	sceneRender(1.0f);	
-	init_menu(GFX_BOTTOM);
+    // Initialize the scene
+    sceneInit();
+    sceneRender(1.0f);  
+    init_menu(GFX_BOTTOM);
+    
+    currentSelection.push(0);
+    while (aptMainLoop()) {
+        hidScanInput();
+        kDown = hidKeysDown();
 
-	while (aptMainLoop()) {
-		hidScanInput();
-		u32 kDown = hidKeysDown();
+        if (kDown & KEY_START) break; // break in order to return to hbmenu
+        if(kDown) {
+        }
+            if(!runLoop()) break;
 
-		if (kDown & KEY_START) break; // break in order to return to hbmenu
-		if(kDown) {
-		}
-			if(!runLoop()) break;
-
-		// Flush and swap framebuffers
-		if(updateScreen) {
-			updateScreen = false;
-//			sceneDraw();
-			gfxFlushBuffers();
-			gfxSwapBuffers();
-		}
-		//Wait for VBlank
-		gspWaitForVBlank();
-	}
+        // Flush and swap framebuffers
+        if(updateScreen) {
+            updateScreen = false;
+//          sceneDraw();
+            gfxFlushBuffers();
+            gfxSwapBuffers();
+        }
+        //Wait for VBlank
+        gspWaitForVBlank();
+    }
 
     if (bSvcHaxAvailable)
     {
         amExit();
     }
 
-	sceneExit();
-	C3D_Fini();
+    sceneExit();
+    C3D_Fini();
     gfxExit();
     hidExit();
     httpcExit();
