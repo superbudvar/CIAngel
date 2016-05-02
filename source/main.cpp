@@ -1,4 +1,5 @@
 #include <string>
+#include <stddef.h>
 #include <vector>
 #include <sstream>
 #include <iomanip>
@@ -42,10 +43,24 @@ enum install_modes {make_cia, install_direct, install_ticket};
 install_modes selected_mode = make_cia;
 int selectedOption = -2;
 int sub_menu_stage = 0;
+static int current = 0;
 static bool updateScreen = true;
 static std::string regionFilter = "off";
 u32 kDown;
 std::stack<int> currentSelection;
+
+struct display_item {
+  int ld;
+  int index;
+  u64 titleId;
+  std::string name;
+  std::string region;
+  std::string serial;
+};
+
+Json::Value characters;
+
+
 
 std::string upper(std::string s)
 {
@@ -59,10 +74,6 @@ std::string upper(std::string s)
   return ups;
 }
 
-struct display_item {
-  int ld;
-  int index;
-};
 
 bool compareByLD(const display_item &a, const display_item &b)
 {
@@ -339,6 +350,12 @@ std::istream& GetLine(std::istream& is, std::string& t)
     }
 }
 
+u64 hex_to_u64( std::string value) {
+    u64 out;
+    std::istringstream(value) >> std::hex >> out;
+    return out;
+}
+
 std::string ToHex(const std::string& s)
 {
     std::ostringstream ret;
@@ -381,6 +398,57 @@ int levenshtein_distance(const std::string &s1, const std::string &s2)
     return result;
 }
 
+int menu_draw_list(const char *title, const char* footer, int back, int count, std::vector<display_item> options, bool forceRefresh)
+{
+    int selected = -2;
+    u32 key = hidKeysDown();
+    int menu_items = count;
+    int max_items_onscreen = 15;
+    
+    if(forceRefresh || key) {
+       // int current = 0;
+        if (key & KEY_UP) {
+            if (current <= 0) {
+                current = menu_items - 1;
+            } else {
+                current--;
+            }
+        } else if (key & KEY_DOWN) {
+            if (current >= menu_items - 1) {
+                current = 0;
+            } else {
+                current++;
+            }
+        } else if (key & KEY_RIGHT) {
+            current += 5;
+            if (current >= menu_items) current = menu_items - 1;
+
+        } else if (key & KEY_LEFT) {
+            current -= 5;
+            if (current < 0) current = 0;
+
+        } else if (key & KEY_A) {
+            selected = current;
+        } else if ((key & KEY_B) && back) {
+            selected = -1;
+        }
+        //  ui_menu_draw(title, footer, back, count, options);
+        setTextColor(0xFF00FF00);
+        renderText(0, 8, 0.7f, 0.7f, false, title);
+        int start_index = 0;
+        if(current > max_items_onscreen-1) {
+            start_index = (current+1)-max_items_onscreen;
+        }
+        for (int i = 0; i + start_index < menu_items && i < max_items_onscreen; i++) {
+            int y_pos = 32+(i*12);
+            ui_menu_draw_string(options[start_index+i].region.c_str(), 1, y_pos, i+start_index==current? 0xFF0000FF: 0xFFFFFFFF);
+            ui_menu_draw_string(options[start_index+i].name.c_str(), 35, y_pos, i+start_index==current? 0xFF0000FF: 0xFFFFFFFF);
+            ui_menu_draw_string(options[start_index+i].serial.c_str(), 290, y_pos, i+start_index==current? 0xFF0000FF: 0xFFFFFFFF);
+        }
+    }
+    return selected;
+}
+
 /* Menu Action Functions */
 void action_search()
 {
@@ -396,15 +464,12 @@ void action_search()
     bool refresh = true;
     bool finished = false;
     // We technically have 30 rows to work with, minus 2 for header/footer. But stick with 20 entries for now
-    unsigned int display_amount = 20; 
+    unsigned int display_amount = 100; 
     char* results[100];
+    char productCode;
     char footer[51];
-    // Set up the reading of json
-    std::ifstream ifs("/CIAngel/wings.json");
-    Json::Reader reader;
-    Json::Value obj;
-    reader.parse(ifs, obj);
-    const Json::Value& characters = obj; // array of characters
+    Result res = 0;
+    AM_TitleEntry entry;
 
     consoleClear();
     clear_screen(GFX_BOTTOM);
@@ -433,18 +498,35 @@ void action_search()
                 sub_menu_stage++;
         } else if(sub_menu_stage == 1) {
                 // Get Results
-                for (unsigned int i = 0; i < characters.size(); i++){
+                for (unsigned int i = 0; i < characters.size(); i++) {
                     std::string temp;
                     temp = characters[i]["name"].asString();
-
-                    int ld = levenshtein_distance(upper(temp), upper(searchstring));
-                    if(temp.find("-System") == std::string::npos &&  (regionFilter == "off" || characters[i]["region"].asString() == regionFilter)) {
-                        if (ld < 10)
-                        {
-                            display_item item;
-                            item.ld = ld;
-                            item.index = i;
-                            display_output.push_back(item);
+                    u64 titleId;
+                    titleId = hex_to_u64(characters[i]["titleID"].asString());  
+                    if(temp.size() >0) {    
+                        if(regionFilter == "off" || (characters[i]["region"].asString() == "ALL" || characters[i]["region"].asString() == regionFilter)) {
+                    //      printf("Name: %s, Region: %s, len: %i\n", temp.c_str(), characters[i]["region"].asString().c_str(), temp.size());
+                            if(temp.find("-System") == std::string::npos) {
+                                int ld = levenshtein_distance(upper(temp), upper(searchstring));
+                                if (ld < 10)
+                                {
+                                    display_item item;
+                                    item.ld = ld;
+                                    item.index = i;
+                                    item.titleId = titleId;
+                                    item.name = characters[i]["name"].asString();
+                                    item.region = characters[i]["region"].asString();
+                                    item.serial = characters[i]["serial"].asString();
+                                    display_output.push_back(item);
+                    
+                                    FS_MediaType mediaType = ((titleId >> 32) & 0x8010) != 0 ? MEDIATYPE_NAND : MEDIATYPE_SD;
+//                                  FS_MediaType mediaType = MEDIATYPE_NAND;
+//                                  if(R_SUCCEEDED(res = AM_GetTitleInfo(mediaType, 1, &titleId, &entry))) {
+                                    if( R_SUCCEEDED(res = AM_GetTitleProductCode(mediaType, titleId, nullptr)) ) {
+                                        printf("%s\n",characters[i]["name"].asString().c_str());
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -465,14 +547,14 @@ void action_search()
                     finished = true;
                 } else {
                     // Eh, allocated memory because we need to format the data
-                    for (u8 i = 0; i < displayCount; i++)
+           /*         for (u8 i = 0; i < displayCount; i++)
                     {
-                        results[i] = (char*)malloc(51 * sizeof(char));
-                        sprintf(results[i], "%-30s (%s) %s",
-                        characters[display_output[i].index]["name"].asString().c_str(),
+                        results[i] = &display_output[i](char*)malloc(51 * sizeof(char));
+                        sprintf(results[i], "%s: %-30s \t %s",
                         characters[display_output[i].index]["region"].asString().c_str(),
-                        characters[display_output[i].index]["code"].asString().c_str());
-                    }
+                        characters[display_output[i].index]["name"].asString().c_str(),
+                        characters[display_output[i].index]["serial"].asString().c_str());
+                    } */
                     sub_menu_stage++;
                 }
         } else if(sub_menu_stage == 2) {
@@ -487,15 +569,16 @@ void action_search()
                 sprintf(footer, "Press A to %s. Press B to return.", mode_text.c_str());
                 result = -2;
                 refresh = true;
-                result = menu_draw_list("Select a Title", footer, 1, displayCount, (const char**)results, refresh);
+                result = menu_draw_list("Select a Title", footer, 1, displayCount, display_output, refresh);
+                //printf("%s, %llx\n", characters[display_output[getCurrent()].index]["titleID"].asString().c_str(), hex_to_u64(characters[display_output[getCurrent()].index]["titleID"].asString()));
                 if(result < 0) {
                     if (result == -1)
                     {
                         // Free our allocated memory
-                        for (u8 i = 0; i < displayCount; i++)
+/*                        for (u8 i = 0; i < displayCount; i++)
                         {
                             free(results[i]);
-                        }
+                        }*/
                         finished = true;
                         sub_menu_stage = 0;
                     }
@@ -507,8 +590,8 @@ void action_search()
                 }
         } else if(sub_menu_stage == 3) {
                 // Fetch the title data and start downloading
-                std::string selected_titleid = characters[display_output[result].index]["titleid"].asString();
-                std::string selected_enckey = characters[display_output[result].index]["enckey"].asString();
+                std::string selected_titleid = characters[display_output[result].index]["titleID"].asString();
+                std::string selected_enckey = characters[display_output[result].index]["encTitleKey"].asString();
                 std::string selected_name = characters[display_output[result].index]["name"].asString();
 
                 printf("OK - %s\n", selected_name.c_str());
@@ -641,7 +724,7 @@ void action_about()
     setTextColor(0xFF0000FF);
     renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
     setTextColor(0xFFCCCCCC);
-    renderText(0, 32, 0.6f, 0.6f, false, "Download, create, and install CIAs directly\nfrom Nintendo's CDN servers. Grabbing the\nlatest games has never been so easy.\n");
+    renderText(0, 32, 0.6f, 0.6f, false, "Download, create, and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
 sceneDraw();
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
@@ -759,6 +842,12 @@ int main(int argc, const char* argv[])
     // Initialize the scene
     sceneInit();
     sceneRender(1.0f);  
+    // Set up the reading of json
+    std::ifstream ifs("/CIAngel/wings.json");
+    Json::Reader reader;
+    Json::Value obj;
+    reader.parse(ifs, obj);
+    characters = obj; // array of characters
     init_menu(GFX_BOTTOM);
     
     currentSelection.push(0);
