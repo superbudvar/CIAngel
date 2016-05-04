@@ -565,7 +565,7 @@ void action_search()
             }
 
             if( bSvcHaxAvailable ) {
-                u64 titleId = hex_to_u64(item.titleId);  
+                u64 titleId = hex_to_u64(item.titleid);  
                 FS_MediaType mediaType = ((titleId >> 32) & 0x8010) != 0 ? MEDIATYPE_NAND : MEDIATYPE_SD;
                 Result res = 0;
                 if( R_SUCCEEDED(res = AM_GetTitleProductCode(mediaType, titleId, nullptr)) ) {
