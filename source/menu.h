@@ -25,7 +25,7 @@ typedef struct ConsoleMenu {
 } ConsoleMenu;
 
 typedef struct {
-  int ld;
+  int score;
   int index;
   bool installed;
   std::string titleid;

@@ -32,28 +32,18 @@
 
 #include "svchax/svchax.h"
 #include "json/json.h"
+#include "fts_fuzzy_match.h"
+#include "utf8proc/utf8proc.h"
 
 static const u16 top = 0x140;
 static bool bSvcHaxAvailable = true;
 static bool bExit = false;
+int sourceDataType;
 Json::Value sourceData;
 enum install_modes {make_cia, install_direct, install_ticket};
 install_modes selected_mode = make_cia;
 
 static std::string regionFilter = "off";
-
-std::string upper(std::string s)
-{
-  std::string ups;
-  
-  for(unsigned int i = 0; i < s.size(); i++)
-  {
-    ups.push_back(std::toupper(s[i]));
-  }
-  
-  return ups;
-}
-
 
 struct find_game_item {
     std::string titleid;
@@ -66,9 +56,9 @@ struct find_game_item {
 // Vector used for download queue
 std::vector<game_item> game_queue;
 
-bool compareByLD(const game_item &a, const game_item &b)
+bool compareByScore(const game_item &a, const game_item &b)
 {
-    return a.ld < b.ld;
+    return a.score > b.score;
 }
 
 Result ConvertToCIA(std::string dir, std::string titleName)
@@ -257,9 +247,11 @@ Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string t
     memcpy(ciaPath,cp.c_str(),cp.size());
     if ( (selected_mode == make_cia) && FileExists(ciaPath))
     {
+        free(ciaPath);
         printf("%s/%s.cia already exists.\n", outputDir.c_str(), titleName.c_str());
         return 0;
     }
+    free(ciaPath);
 
     std::ofstream ofs;
 
@@ -432,35 +424,20 @@ std::string ToHex(const std::string& s)
     return ret.str();
 }
 
-int levenshtein_distance(const std::string &s1, const std::string &s2)
+void load_JSON_data() 
 {
-    // To change the type this function manipulates and returns, change
-    // the return type and the types of the two variables below.
-    int s1len = s1.size();
-    int s2len = s2.size();
+    printf("loading wings.json...\n");
+    std::ifstream ifs("/CIAngel/wings.json");
+    Json::Reader reader;
+    Json::Value obj;
+    reader.parse(ifs, obj);
+    sourceData = obj; // array of characters
     
-    auto column_start = (decltype(s1len))1;
-    
-    auto column = new decltype(s1len)[s1len + 1];
-    std::iota(column + column_start, column + s1len + 1, column_start);
-    
-    for (auto x = column_start; x <= s2len; x++) {
-        column[0] = x;
-        auto last_diagonal = x - column_start;
-        for (auto y = column_start; y <= s1len; y++) {
-            auto old_diagonal = column[y];
-            auto possibilities = {
-                column[y] + 1,
-                column[y - 1] + 1,
-                last_diagonal + (s1[y - 1] == s2[x - 1]? 0 : 1)
-            };
-            column[y] = std::min(possibilities);
-            last_diagonal = old_diagonal;
-        }
+    if(sourceData[0]["titleID"].isString()) {
+      sourceDataType = JSON_TYPE_ONLINE;
+    } else if (sourceData[0]["titleid"].isString()) {
+      sourceDataType = JSON_TYPE_WINGS;
     }
-    auto result = column[s1len];
-    delete[] column;
-    return result;
 }
 
 // Search menu keypress callback
@@ -537,7 +514,7 @@ void action_search()
     consoleClear();
 
     printf("Please enter text to search for:\n");
-    std::string searchstring = getInput(&sHBKB, bKBCancelled);
+    std::string searchString = getInput(&sHBKB, bKBCancelled);
     if (bKBCancelled)
     {
         return;
@@ -547,41 +524,70 @@ void action_search()
     clear_screen(GFX_BOTTOM);
 
     std::vector<game_item> display_output;
-    for (unsigned int i = 0; i < sourceData.size(); i++){
-        std::string temp;
-        temp = sourceData[i]["name"].asString();
-        if(temp.size() >0 && temp.find("-System") == std::string::npos && (regionFilter == "off" || sourceData[i]["region"].asString() == regionFilter)) {
-            int ld = levenshtein_distance(upper(temp), upper(searchstring));
-            if (ld < 10)
-            {
-                game_item item;
-                item.ld = ld;
-                item.index = i;
-                item.titleid = sourceData[i]["titleid"].asString();
-                item.titlekey = sourceData[i]["enckey"].asString();
-                item.name = sourceData[i]["name"].asString();
-                item.region = sourceData[i]["region"].asString();
-                item.code = sourceData[i]["code"].asString();
-                item.installed = false;
 
-                u64 titleId = hex_to_u64(sourceData[i]["titleid"].asString());  
+    // UTF8 normalization stuff
+    utf8proc_option_t options = (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE | UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT | UTF8PROC_STRIPMARK | UTF8PROC_STRIPCC);
+    utf8proc_uint8_t* szName;
+    utf8proc_uint8_t *str;
+    int outScore;
+    for (unsigned int i = 0; i < sourceData.size(); i++) {
+        if(regionFilter != "off" && sourceData[i]["region"].asString() != regionFilter) {
+            continue;
+        }
+
+        // Normalize the name down to ASCII. This may break Japanese characters...
+        str = (utf8proc_uint8_t*)sourceData[i]["name"].asCString();
+        utf8proc_map(str, 0, &szName, options);
+
+        // Fuzzy match based on the search term
+        if (fts::fuzzy_match(searchString.c_str(), (const char*)szName, outScore))
+        {
+            game_item item;
+            item.score = outScore;
+            item.index = i;
+            item.installed = false;
+
+            switch(sourceDataType) {
+            case JSON_TYPE_WINGS:
+              item.titleid = sourceData[i]["titleid"].asString();
+              item.titlekey = sourceData[i]["enckey"].asString();
+              item.name = (const char*)szName;
+              item.region = sourceData[i]["region"].asString();
+              item.code = sourceData[i]["code"].asString();
+              break;
+            case JSON_TYPE_ONLINE:
+              item.titleid = sourceData[i]["titleID"].asString();
+              item.titlekey = sourceData[i]["encTitleKey"].asString();
+              item.name = (const char*)szName;
+              item.region = sourceData[i]["region"].asString();
+              item.code = sourceData[i]["serial"].asString();
+              break;
+            }
+
+            if( bSvcHaxAvailable ) {
+                u64 titleId = hex_to_u64(item.titleId);  
                 FS_MediaType mediaType = ((titleId >> 32) & 0x8010) != 0 ? MEDIATYPE_NAND : MEDIATYPE_SD;
                 Result res = 0;
-                if( bSvcHaxAvailable && R_SUCCEEDED(res = AM_GetTitleProductCode(mediaType, titleId, nullptr)) ) {
+                if( R_SUCCEEDED(res = AM_GetTitleProductCode(mediaType, titleId, nullptr)) ) {
                     item.installed = true;
                 }
+            }
+            std::string typeCheck = item.titleid.substr(4,4);
+            //if title id belongs to gameapp/dlc/update/dsiware, use it. if not, ignore. case sensitve of course
+            if(typeCheck == "0000" || typeCheck == "008c" || typeCheck == "000e" || typeCheck == "8004"){
                 display_output.push_back(item);
             }
+        
         }
+
+        free(szName);
     }
 
-
-    // sort similar names by levenshtein distance
-    std::sort(display_output.begin(), display_output.end(), compareByLD);
+    // sort similar names by fuzzy score
+    std::sort(display_output.begin(), display_output.end(), compareByScore);
 
     // We technically have 30 rows to work with, minus 2 for header/footer. But stick with 20 entries for now
     unsigned int display_amount = display_output.size();
-    display_output.resize(display_amount);
 
     if (display_amount == 0)
     {
@@ -653,6 +659,7 @@ void action_manual_entry()
 {
     HB_Keyboard sHBKB;
     bool bKBCancelled = false;
+    std::string key;
 
     consoleClear();
 
@@ -666,13 +673,24 @@ void action_manual_entry()
             break;
         }
 
-        printf("Please enter the corresponding encTitleKey:\n");
-        std::string key = getInput(&sHBKB, bKBCancelled);
-        if (bKBCancelled)
-        {
-            break;
-        }
+        for (unsigned int i = 0; i < sourceData.size(); i++){
+            std::string tempId = sourceData[i]["titleid"].asString();
+            std::string tempKey = sourceData[i]["enckey"].asString();
 
+            if(tempId.compare(titleId) == 0 && tempKey.size() == 32) {
+               printf("Found encTitleKey, proceeding automatically\n"); 
+               key = tempKey;
+               break;
+            }
+        }
+        if(key.size() != 32) {
+            printf("Please enter the corresponding encTitleKey:\n");
+            std::string key = getInput(&sHBKB, bKBCancelled);
+            if (bKBCancelled)
+            {
+                break;
+            }
+        }
         if (titleId.length() == 16 && key.length() == 32)
         {
             DownloadTitle(titleId, key, "");
@@ -759,6 +777,14 @@ void action_exit()
     bExit = true;
 }
 
+void action_download()
+{
+    consoleClear();
+
+    download_JSON();
+    load_JSON_data();
+}
+
 // Main menu keypress callback
 bool menu_main_keypress(int selected, u32 key, void*)
 {
@@ -780,9 +806,12 @@ bool menu_main_keypress(int selected, u32 key, void*)
                 action_input_txt();
             break;
             case 4:
-                action_about();
+                action_download();
             break;
             case 5:
+                action_about();
+            break;
+            case 6:
                 action_exit();
             break;
         }
@@ -812,8 +841,9 @@ void menu_main()
         "Process download queue",
         "Enter a title key/ID pair",
         "Fetch title key/ID from input.txt",
+        "Download wings.json",
         "About CIAngel",
-        "Exit"
+        "Exit",
     };
     char footer[50];
 
@@ -878,13 +908,8 @@ int main(int argc, const char* argv[])
     init_menu(GFX_TOP);
     // Set up the reading of json
     check_JSON();
-    printf("loading wings.json...\n");
-    std::ifstream ifs("/CIAngel/wings.json");
-    Json::Reader reader;
-    Json::Value obj;
-    reader.parse(ifs, obj);
-    sourceData = obj; // array of characters
-
+    load_JSON_data();
+    
     menu_main();
 
     if (bSvcHaxAvailable)
