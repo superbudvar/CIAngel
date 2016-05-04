@@ -27,6 +27,7 @@ typedef struct ConsoleMenu {
 typedef struct {
   int ld;
   int index;
+  bool installed;
   std::string titleid;
   std::string titlekey;
   std::string name;

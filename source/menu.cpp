@@ -83,7 +83,7 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
                 (*options)[current].region.c_str(),
                 (*options)[current].code.c_str());
             if(menu_offset == previous_menu_offset) {
-                menu_draw_string(prev_entry, 1, menu_pos_y + (previous_index-menu_offset), CONSOLE_WHITE);
+                menu_draw_string(prev_entry, 1, menu_pos_y + (previous_index-menu_offset), (*options)[previous_index].installed ? CONSOLE_GREEN : CONSOLE_WHITE );
                 menu_draw_string(entry, 1, menu_pos_y + (current-menu_offset), CONSOLE_REVERSE);
             } else {
                 consoleClear();
@@ -99,7 +99,7 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
                     if(i+menu_offset == current) {
                         menu_draw_string(entry, 1, current_pos_y, CONSOLE_REVERSE);
                     } else {
-                        menu_draw_string(entry, 1, current_pos_y, CONSOLE_WHITE);
+                        menu_draw_string(entry, 1, current_pos_y, (*options)[menu_offset + i].installed ? CONSOLE_GREEN : CONSOLE_WHITE);
                     }
                     current_pos_y++;
                     previous_menu_offset = menu_offset;

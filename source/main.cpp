@@ -203,7 +203,7 @@ void InstallTicket(std::string FullPath)
     AM_InstallTicketBegin(&hTik);
     std::string curr = get_file_contents(FullPath.c_str());
     FSFILE_Write(hTik, &writtenbyte, 0, curr.c_str(), 0x100000, 0);
-    AM_InstallTicketFinalize(hTik);
+    AM_InstallTicketFinish(hTik);
     printf("Ticket Installed.");
     //delete temp ticket, ticket folder still exists... ugly. later stream directly to the handle
     remove(FullPath.c_str());
@@ -415,6 +415,12 @@ std::istream& GetLine(std::istream& is, std::string& t)
     }
 }
 
+u64 hex_to_u64( std::string value) {
+    u64 out;
+    std::istringstream(value) >> std::hex >> out;
+    return out;
+}
+
 std::string ToHex(const std::string& s)
 {
     std::ostringstream ret;
@@ -544,9 +550,8 @@ void action_search()
     for (unsigned int i = 0; i < sourceData.size(); i++){
         std::string temp;
         temp = sourceData[i]["name"].asString();
-
-        int ld = levenshtein_distance(upper(temp), upper(searchstring));
-        if(temp.find("-System") == std::string::npos &&  (regionFilter == "off" || sourceData[i]["region"].asString() == regionFilter)) {
+        if(temp.size() >0 && temp.find("-System") == std::string::npos && (regionFilter == "off" || sourceData[i]["region"].asString() == regionFilter)) {
+            int ld = levenshtein_distance(upper(temp), upper(searchstring));
             if (ld < 10)
             {
                 game_item item;
@@ -557,11 +562,19 @@ void action_search()
                 item.name = sourceData[i]["name"].asString();
                 item.region = sourceData[i]["region"].asString();
                 item.code = sourceData[i]["code"].asString();
+                item.installed = false;
 
+                u64 titleId = hex_to_u64(sourceData[i]["titleid"].asString());  
+                FS_MediaType mediaType = ((titleId >> 32) & 0x8010) != 0 ? MEDIATYPE_NAND : MEDIATYPE_SD;
+                Result res = 0;
+                if( bSvcHaxAvailable && R_SUCCEEDED(res = AM_GetTitleProductCode(mediaType, titleId, nullptr)) ) {
+                    item.installed = true;
+                }
                 display_output.push_back(item);
             }
         }
     }
+
 
     // sort similar names by levenshtein distance
     std::sort(display_output.begin(), display_output.end(), compareByLD);
