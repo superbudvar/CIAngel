@@ -439,8 +439,8 @@ std::string ToHex(const std::string& s)
 
 void load_JSON_data() 
 {
-    setTextColor(0xFF00FF00);
-    renderText(0,0, 1.5f, 1.5f, false, "loading wings.json...");
+    setTextColor(COLOR_FOOTER);
+    renderText(0,0, 1.0f, 1.0f, false, "loading wings.json...");
     sceneDraw();
     std::ifstream ifs("/CIAngel/wings.json");
     Json::Reader reader;
@@ -566,20 +566,18 @@ void action_search()
             item.score = outScore;
             item.index = i;
 
+            item.name = sourceData[i]["name"].asString();
+            item.norm_name = (const char*)szName;
+            item.region = sourceData[i]["region"].asString();
             switch(sourceDataType) {
             case JSON_TYPE_WINGS:
               item.titleid = sourceData[i]["titleid"].asString();
               item.titlekey = sourceData[i]["enckey"].asString();
-              item.name = sourceData[i]["name"].asString();
-              item.norm_name = (const char*)szName;
-              item.region = sourceData[i]["region"].asString();
               item.code = sourceData[i]["code"].asString();
               break;
             case JSON_TYPE_ONLINE:
               item.titleid = sourceData[i]["titleID"].asString();
               item.titlekey = sourceData[i]["encTitleKey"].asString();
-              item.name = (const char*)szName;
-              item.region = sourceData[i]["region"].asString();
               item.code = sourceData[i]["serial"].asString();
               break;
             }
