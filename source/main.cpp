@@ -691,8 +691,12 @@ void action_manual_entry()
         }
 
         for (unsigned int i = 0; i < sourceData.size(); i++){
-            std::string tempId = sourceData[i]["titleid"].asString();
-            std::string tempKey = sourceData[i]["enckey"].asString();
+            std::string tempId = sourceData[i]["titleID"].asString();
+            std::string tempKey = sourceData[i]["encTitleKey"].asString();
+            if(sourceDataType == JSON_TYPE_WINGS) {
+                tempId = sourceData[i]["titleid"].asString();
+                tempKey = sourceData[i]["enckey"].asString();
+            }
 
             if(tempId.compare(titleId) == 0 && tempKey.size() == 32) {
                printf("Found encTitleKey, proceeding automatically\n"); 
