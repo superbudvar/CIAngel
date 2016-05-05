@@ -776,14 +776,15 @@ void action_about()
     consoleClear();
 
     printf(CONSOLE_RED "CIAngel by cearp and Drakia\n" CONSOLE_RESET);
-    printf("Download, create, and install CIAs directly\n");
-    printf("from Nintendo's CDN servers. Grabbing the\n");
-    printf("latest games has never been so easy.\n");
+    printf("Download, create and install CIAs\n");
+    printf("directly from Nintendo's CDN servers.\n");
+    printf("Grabbing the latest games has never been");
+    printf("so easy.\n");
     setTextColor(0xFF0000FF);
     renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
     setTextColor(0xFFCCCCCC);
-    renderText(0, 32, 0.6f, 0.6f, false, "Download, create, and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
-sceneDraw();
+    renderText(0, 32, 0.6f, 0.6f, false, "Download, create and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
+    sceneDraw();
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
@@ -871,19 +872,19 @@ void menu_main()
     {
 //        if(updateScreen) {
             updateScreen = false;
+            gspWaitForVBlank();
             sceneDraw();
             gfxFlushBuffers();
             gfxSwapBuffers();
+            clear_screen(GFX_BOTTOM);
 //        }
         //Wait for VBlank
-        gspWaitForVBlank();
         
         // We have to update the footer every draw, incase the user switches install mode or region
         sprintf(footer, "(L):Change Installation Mode (R):Change Region Queue: %d", game_queue.size());
 
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
 
-        clear_screen(GFX_BOTTOM);
     }
 }
 
