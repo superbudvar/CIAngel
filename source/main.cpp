@@ -316,7 +316,7 @@ void ProcessGameQueue()
     {
         std::string selected_titleid = (*game).titleid;
         std::string selected_enckey = (*game).titlekey;
-        std::string selected_name = (*game).name;
+        std::string selected_name = (*game).norm_name;
 
         if (selected_mode == install_ticket)
         {
@@ -372,20 +372,25 @@ std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
                 sceneDraw();
                 last_input = input;
             }
+            //Wait for VBlank
+            //gfxFlushBuffers();
+            //gfxSwapBuffers();
         }
-
-        //Wait for VBlank
         gspWaitForVBlank();
+
     }
     gfxSetScreenFormat(GFX_BOTTOM, format);
     clear_screen(GFX_BOTTOM);
     return input;
 }
 
-void removeForbiddenChar(std::string* s)
+void removeForbiddenChar(std::string* s, bool onlyCR = false)
 {
     std::string::iterator it;
-    std::string illegalChars = "\\/:?\"<>|";
+    std::string illegalChars = "\n";
+    if(!onlyCR) {
+        illegalChars = "\n\\/:?\"<>|";
+    }
     for (it = s->begin() ; it < s->end() ; ++it){
         bool found = illegalChars.find(*it) != std::string::npos;
         if(found)
@@ -480,7 +485,7 @@ bool menu_search_keypress(int selected, u32 key, void* data)
         // Fetch the title data and start downloading
         std::string selected_titleid = (*cb_data)[selected].titleid;
         std::string selected_enckey = (*cb_data)[selected].titlekey;
-        std::string selected_name = (*cb_data)[selected].name;
+        std::string selected_name = (*cb_data)[selected].norm_name;
 
         printf("OK - %s\n", selected_name.c_str());
         //removes any problem chars, not sure if whitespace is a problem too...?
@@ -552,7 +557,7 @@ void action_search()
     int outScore;
     
     for (unsigned int i = 0; i < sourceData.size(); i++) {
-        if(regionFilter != "off" && sourceData[i]["region"].asString() != regionFilter) {
+        if( regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" || sourceData[i]["region"].asString() != regionFilter) ) {
             continue;
         }
 
@@ -565,8 +570,8 @@ void action_search()
             game_item item;
             item.score = outScore;
             item.index = i;
-
             item.name = sourceData[i]["name"].asString();
+            removeForbiddenChar(&item.name, true);
             item.norm_name = (const char*)szName;
             item.region = sourceData[i]["region"].asString();
             switch(sourceDataType) {
@@ -581,7 +586,6 @@ void action_search()
               item.code = sourceData[i]["serial"].asString();
               break;
             }
-
             std::string typeCheck = item.titleid.substr(4,4);
             //if title id belongs to gameapp/dlc/update/dsiware, use it. if not, ignore. case sensitve of course
             if(typeCheck == "0000" || typeCheck == "008c" || typeCheck == "000e" || typeCheck == "8004"){
@@ -881,7 +885,7 @@ void menu_main()
         //Wait for VBlank
         
         // We have to update the footer every draw, incase the user switches install mode or region
-        sprintf(footer, "(L):Change Installation Mode (R):Change Region Queue: %d", game_queue.size());
+        sprintf(footer, "(L):Install Mode (R):Region |  Queue: %d", game_queue.size());
 
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
 
