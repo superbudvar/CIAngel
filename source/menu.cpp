@@ -35,6 +35,20 @@ void ui_menu_draw_string(const char* str, int pos_x, int pos_y, u32 color)
     setTextColor(color); // black
     renderText(pos_x, pos_y, FONT_DEFAULT_SIZE, FONT_DEFAULT_SIZE, false, str);
 }
+
+void ui_menu_draw(const char *title, const char* footer, int back, int count, const char *options[]) {
+    setTextColor(0xFF00FF00);
+    renderText(0, 8, 0.7f, 0.7f, false, title);
+    for (int i = 0; i < count && i < (currentMenu.menuConsole.consoleHeight - 2); i++) {
+        ui_menu_draw_string(options[i], 1, 32+(i*12), 0xFF000000);
+        //ui_menu_draw_string(options[i], 1, 32+(i*12), i==current? 0xFF0000FF: 0xFF000000);
+    }
+    if (footer != NULL)
+    {
+        sceneRenderFooter(footer);
+    }
+}
+
 void menu_draw_string_full(const char* str, int pos_y, const char* color)
 {
     currentMenu.menuConsole.cursorX = 0;
@@ -54,19 +68,6 @@ void menu_draw_string_full(const char* str, int pos_y, const char* color)
     gfxFlushBuffers();
 }
 
-void ui_menu_draw(const char *title, const char* footer, int back, int count, const char *options[]) {
-    setTextColor(0xFF00FF00);
-    renderText(0, 8, 0.7f, 0.7f, false, title);
-    for (int i = 0; i < count && i < (currentMenu.menuConsole.consoleHeight - 2); i++) {
-        ui_menu_draw_string(options[i], 1, 32+(i*12), 0xFF000000);
-        //ui_menu_draw_string(options[i], 1, 32+(i*12), i==current? 0xFF0000FF: 0xFF000000);
-    }
-    if (footer != NULL)
-    {
-        sceneRenderFooter(footer);
-    }
-}
-
 void titles_multkey_draw(const char *title, const char* footer, int back, std::vector<game_item> *options, void* data,
                       bool (*callback)(int result, u32 key, void* data))
 
@@ -83,7 +84,7 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
     int menu_end_y = 19;
     int current_pos_y = 0;
 
-    while (aptMainLoop()) {
+    while (!bExit && aptMainLoop()) {
         if(firstLoop || previous_index != current) {
             firstLoop = false;
             int results_per_page = menu_end_y - menu_pos_y;
@@ -162,7 +163,7 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
     int menu_end_y = 18; 
     int current_pos_y = 0;
 
-    while (aptMainLoop()) {
+    while (!bExit && aptMainLoop()) {
         std::string mode_text;
         if(selected_mode == make_cia) {
             mode_text = "Create CIA";
@@ -198,12 +199,12 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
                 current_pos_y++;
             }
             setTextColor(COLOR_FOOTER);
-            renderText(0, 150, 0.7f, 0.7f, false, "Mode:");
-            renderText(40, 150, 0.7f, 0.7f, false, "Region:");
-            renderText(80, 150, 0.7f, 0.7f, false, "Queue:");
+            renderText(0, 220, 0.7f, 0.7f, false, "Mode:");
+            renderText(165, 220, 0.7f, 0.7f, false, "Region:");
+            renderText(300, 220, 0.7f, 0.7f, false, "Queue:");
             setTextColor(COLOR_FOOTER_SELECTED);
-            renderText(20, 150, 0.7f, 0.7f, false, mode_text.c_str());
-            renderText(60, 150, 0.7f, 0.7f, false, regionFilter.c_str());
+            renderText(60, 220, 0.7f, 0.7f, false, mode_text.c_str());
+            renderText(235, 220, 0.7f, 0.7f, false, regionFilter.c_str());
 //            std::string qSize = sprintf("%ld". game_queue.size());
   //          renderText(100, 150, 0.7f, 0.7f, false, qSize.c_str());
             if (footer != NULL)

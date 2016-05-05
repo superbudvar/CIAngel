@@ -43,7 +43,6 @@ extern ConsoleMenu currentMenu;
 static const u16 top = 0x140;
 static bool bSvcHaxAvailable = true;
 static bool updateScreen = true;
-bool bExit = false;
 int sourceDataType;
 std::vector<game_item> game_queue;
 Json::Value sourceData;
@@ -441,7 +440,7 @@ std::string ToHex(const std::string& s)
 void load_JSON_data() 
 {
     setTextColor(0xFF00FF00);
-    renderText(0,0, 2.0f, 2.0f, false, "loading wings.json...");
+    renderText(0,0, 1.5f, 1.5f, false, "loading wings.json...");
     sceneDraw();
     std::ifstream ifs("/CIAngel/wings.json");
     Json::Reader reader;
