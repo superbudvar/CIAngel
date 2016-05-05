@@ -758,7 +758,6 @@ void action_toggle_install()
 
 void action_toggle_region()
 {
-    consoleClear();
     if(regionFilter == "off") {
         regionFilter = "ALL";
     } else if (regionFilter == "ALL") {
@@ -768,8 +767,6 @@ void action_toggle_region()
     } else if (regionFilter == "USA") {
         regionFilter = "JPN";
     } else if (regionFilter == "JPN") {
-        regionFilter = "---";
-    } else if (regionFilter == "---") {
         regionFilter = "off";
     }
 }
