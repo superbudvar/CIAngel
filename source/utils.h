@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include <3ds.h>
+#include "display.h"
 
 #define NUS_URL "http://ccs.cdn.c.shop.nintendowifi.net/ccs/download/"
 #define JSON_URL "http://3ds.nfshost.com/json"

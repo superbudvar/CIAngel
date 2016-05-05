@@ -567,7 +567,13 @@ bool download_JSON() {
 
 bool check_JSON() {
     if(!FileExists ("/CIAngel/wings.json")) {
-        printf("No wings.json\n");
+        setTextColor(0xFF00FF00);
+        renderText(150,50, 1.0f, 1.0f, false, "No wings.json");
+        sceneDraw();
+            gfxFlushBuffers();
+            gfxSwapBuffers();
+        //Wait for VBlank
+        gspWaitForVBlank();
 
         printf("\nPress A to Download, or any other key to return.\n");
         u32 keys = wait_key();

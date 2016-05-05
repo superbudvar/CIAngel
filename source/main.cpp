@@ -1,5 +1,3 @@
-#include <string>
-#include <vector>
 #include <sstream>
 #include <iomanip>
 #include <fstream>
@@ -24,26 +22,34 @@
 #include <hbkb.h>
 
 #include <3ds.h>
+#include <citro3d.h>
+#include "vshader_shbin.h"
+#include "display.h"
 
-#include "menu.h"
 #include "utils.h"
 #include "cia.h"
 #include "data.h"
 
 #include "svchax/svchax.h"
+#include "common.h"
 #include "json/json.h"
 #include "fts_fuzzy_match.h"
 #include "utf8proc/utf8proc.h"
+#include "menu.h"
 
+
+// Vector used for download queue
+extern ConsoleMenu currentMenu;
 static const u16 top = 0x140;
 static bool bSvcHaxAvailable = true;
-static bool bExit = false;
+static bool updateScreen = true;
+bool bExit = false;
 int sourceDataType;
+std::vector<game_item> game_queue;
 Json::Value sourceData;
-enum install_modes {make_cia, install_direct, install_ticket};
-install_modes selected_mode = make_cia;
 
-static std::string regionFilter = "off";
+u32 kDown;
+std::stack<int> currentSelection;
 
 struct find_game_item {
     std::string titleid;
@@ -52,9 +58,6 @@ struct find_game_item {
         return gi.titleid == titleid;
     }
 };
-
-// Vector used for download queue
-std::vector<game_item> game_queue;
 
 bool compareByScore(const game_item &a, const game_item &b)
 {
@@ -334,10 +337,14 @@ void ProcessGameQueue()
 
 std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
 {
+    GSPGPU_FramebufferFormats format = gfxGetScreenFormat(GFX_BOTTOM);
+    gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
+    clear_screen(GFX_BOTTOM);
     sHBKB->HBKB_Clean();
     touchPosition touch;
     u8 KBState = 4;
     std::string input;
+    std::string last_input;
     while (KBState != 1 || input.length() == 0)
     {
         hidScanInput();
@@ -349,23 +356,24 @@ std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
         if (KBState == 3)
         {
             bCancelled = true;
+            input = "";
             break;
         }
         // Otherwise if the user has entered a key
         else if (KBState != 4)
         {
-            printf("%c[2K\r", 27);
-            printf("%s", input.c_str());
+            if(strcmp(last_input.c_str(),input.c_str()) != 0) {
+                ui_menu_draw_string(input.c_str(), 10, 10, COLOR_SELECTED);
+                sceneDraw();
+                last_input = input;
+            }
         }
-
-        // Flush and swap framebuffers
-        gfxFlushBuffers();
-        gfxSwapBuffers();
 
         //Wait for VBlank
         gspWaitForVBlank();
     }
-    printf("\n");
+    gfxSetScreenFormat(GFX_BOTTOM, format);
+    clear_screen(GFX_BOTTOM);
     return input;
 }
 
@@ -407,6 +415,12 @@ std::istream& GetLine(std::istream& is, std::string& t)
     }
 }
 
+u64 hex_to_u64( std::string value) {
+    u64 out;
+    std::istringstream(value) >> std::hex >> out;
+    return out;
+}
+
 std::string ToHex(const std::string& s)
 {
     std::ostringstream ret;
@@ -420,12 +434,13 @@ std::string ToHex(const std::string& s)
 
 void load_JSON_data() 
 {
-    printf("loading wings.json...\n");
+    setTextColor(0xFF00FF00);
+    renderText(0,0, 2.0f, 2.0f, false, "loading wings.json...");
+    sceneDraw();
     std::ifstream ifs("/CIAngel/wings.json");
     Json::Reader reader;
     Json::Value obj;
-    reader.parse(ifs, obj);
-    sourceData = obj; // array of characters
+    reader.parse(ifs, sourceData);
     
     if(sourceData[0]["titleID"].isString()) {
       sourceDataType = JSON_TYPE_ONLINE;
@@ -544,7 +559,8 @@ void action_search()
             case JSON_TYPE_WINGS:
               item.titleid = sourceData[i]["titleid"].asString();
               item.titlekey = sourceData[i]["enckey"].asString();
-              item.name = (const char*)szName;
+              item.name = sourceData[i]["name"].asString();
+              item.norm_name = (const char*)szName;
               item.region = sourceData[i]["region"].asString();
               item.code = sourceData[i]["code"].asString();
               break;
@@ -754,6 +770,11 @@ void action_about()
     printf("Download, create, and install CIAs directly\n");
     printf("from Nintendo's CDN servers. Grabbing the\n");
     printf("latest games has never been so easy.\n");
+    setTextColor(0xFF0000FF);
+    renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
+    setTextColor(0xFFCCCCCC);
+    renderText(0, 32, 0.6f, 0.6f, false, "Download, create, and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
+sceneDraw();
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
@@ -834,19 +855,17 @@ void menu_main()
 
     while (!bExit)
     {
-        std::string mode_text;
-        if(selected_mode == make_cia) {
-            mode_text = "Create CIA";
-        }
-        else if (selected_mode == install_direct) {
-            mode_text = "Install CIA";
-        }
-        else if (selected_mode == install_ticket) {
-            mode_text = "Create Ticket";
-        }
-
+//        if(updateScreen) {
+            updateScreen = false;
+            sceneDraw();
+            gfxFlushBuffers();
+            gfxSwapBuffers();
+//        }
+        //Wait for VBlank
+        gspWaitForVBlank();
+        
         // We have to update the footer every draw, incase the user switches install mode or region
-        sprintf(footer, "Mode (L):%s Region (R):%s Queue: %d", mode_text.c_str(), regionFilter.c_str(), game_queue.size());
+        sprintf(footer, "(L):Change Installation Mode (R):Change Region Queue: %d", game_queue.size());
 
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
 
@@ -875,7 +894,7 @@ int main(int argc, const char* argv[])
 
     u32 *soc_sharedmem, soc_sharedmem_size = 0x100000;
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    consoleInit(GFX_BOTTOM, NULL);
 
     httpcInit(0);
     soc_sharedmem = (u32 *)memalign(0x1000, soc_sharedmem_size);
@@ -889,8 +908,12 @@ int main(int argc, const char* argv[])
         amInit();
         AM_InitializeExternalTitleDatabase(false);
     }
+    // Initialize the scene
+    sceneInit();
+    sceneRender(1.0f);  
+    sceneDraw();
+    init_menu(GFX_BOTTOM);
 
-    init_menu(GFX_TOP);
     // Set up the reading of json
     check_JSON();
     load_JSON_data();
@@ -902,6 +925,8 @@ int main(int argc, const char* argv[])
         amExit();
     }
 
+    sceneExit();
+    C3D_Fini();
     acExit();
     gfxExit();
     hidExit();

@@ -6,23 +6,22 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
+#include "common.h"
 
 #include <stdint.h>
 #include <stddef.h>
 
-
 #define MAX_SELECTED_OPTIONS 0x10
 
-#define COLOR_TITLE 0x0000FF
-#define COLOR_NEUTRAL 0xFFFFFF
-#define COLOR_SELECTED 0xFF0000
-#define COLOR_BACKGROUND 0x000000
+#define COLOR_TITLE 0xFF0000FF
+#define COLOR_NEUTRAL 0xFFFFFFFF
+#define COLOR_MENU_ITEM 0xFFFFFFFF
+#define COLOR_SELECTED 0xFFFF0000
+#define COLOR_FOOTER 0xFF00aa00
+#define COLOR_FOOTER_SELECTED 0xFF00aa00
+#define COLOR_BACKGROUND 0xFF000000
 
 #define CONSOLE_REVERSE		CONSOLE_ESC(7m)
-
-typedef struct ConsoleMenu {
-	PrintConsole menuConsole;
-} ConsoleMenu;
 
 typedef struct {
   int score;
@@ -30,12 +29,15 @@ typedef struct {
   std::string titleid;
   std::string titlekey;
   std::string name;
+  std::string norm_name;
   std::string region;
   std::string code;
 } game_item;
 
-extern ConsoleMenu currentMenu;
+extern std::vector<game_item> game_queue;
+
 void init_menu(gfxScreen_t screen);
+void ui_menu_draw_string(const char* str, int pos_x, int pos_y, u32 color);
 void menu_draw_string(const char* str, int pos_x, int pos_y, const char* color);
 void menu_draw_string_full(const char* str, int pos_y, const char* color);
 void titles_multkey_draw(const char *title, const char* footer, int back, std::vector<game_item> *options, void* data,
