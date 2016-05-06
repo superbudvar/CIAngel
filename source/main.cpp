@@ -557,7 +557,7 @@ void action_search()
     int outScore;
     
     for (unsigned int i = 0; i < sourceData.size(); i++) {
-        if( regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" || sourceData[i]["region"].asString() != regionFilter) ) {
+        if( regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" && sourceData[i]["region"].asString() != regionFilter) ) {
             continue;
         }
 

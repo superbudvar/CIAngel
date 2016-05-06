@@ -566,23 +566,46 @@ bool download_JSON() {
 }
 
 bool check_JSON() {
-    if(!FileExists ("/CIAngel/wings.json")) {
-        setTextColor(0xFF00FF00);
-        renderText(150,50, 1.0f, 1.0f, false, "No wings.json");
-        sceneDraw();
-            gfxFlushBuffers();
-            gfxSwapBuffers();
+    struct stat filestats;
+    int ret = stat("/CIAngel/wings.json", &filestats);
+    time_t curtime = time(NULL);
+
+    if (ret == 0) {
+      u64 mtime;
+      sdmc_getmtime("/CIAngel/wings.json", &mtime);
+      double age_seconds = difftime(curtime, mtime);
+      double age_days = age_seconds / (60 * 60 * 24);
+
+      if (age_seconds > JSON_UPDATE_INTERVAL_IN_SECONDS) {
+        printf("Your wings.json is %d days old\n\n", (int)age_days);
+        printf("Press A to update, or any other key to skip.\n");
         //Wait for VBlank
         gspWaitForVBlank();
+        sceneDraw();
+        gfxFlushBuffers();
+        gfxSwapBuffers();
 
-        printf("\nPress A to Download, or any other key to return.\n");
         u32 keys = wait_key();
-        
+
         if (keys & KEY_A) {
           return download_JSON();
         }
-        printf("\nDon't expect search to work\n");
-        return false;
+        return true;
+      }
+    } else {
+        setTextColor(0xFF00FF00);
+        renderText(150,50, 1.0f, 1.0f, false, "No wings.json");
+
+      printf("\nPress A to Download, or any other key to return.\n");
+      u32 keys = wait_key();
+      
+      if (keys & KEY_A) {
+        return download_JSON();
+      }
+      printf("\nDon't expect search to work\n");
+      return false;
     }
+
     return true;
 }
+
