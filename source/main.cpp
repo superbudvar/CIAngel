@@ -933,6 +933,7 @@ int main(int argc, const char* argv[])
     }
     // Initialize the scene
     sceneInit();
+    sceneRender(1.0f);
     sceneDraw();
     init_menu(GFX_BOTTOM);
 
