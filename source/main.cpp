@@ -933,10 +933,8 @@ int main(int argc, const char* argv[])
     }
     // Initialize the scene
     sceneInit();
-    sceneRender(1.0f);  
     sceneDraw();
     init_menu(GFX_BOTTOM);
-    init_menu(GFX_TOP);
 
     // Make sure /CIAngel exists on the SD card
     mkpath("/CIAngel", 0777);
