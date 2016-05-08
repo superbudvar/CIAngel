@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
+#include <cstdlib>
 
 #include "common.h"
 #include "utils.h"
@@ -205,8 +206,10 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
             setTextColor(COLOR_FOOTER_SELECTED);
             renderText(60, 220, 0.7f, 0.7f, false, mode_text.c_str());
             renderText(235, 220, 0.7f, 0.7f, false, regionFilter.c_str());
-//            std::string qSize = sprintf("%ld". game_queue.size());
-  //          renderText(100, 150, 0.7f, 0.7f, false, qSize.c_str());
+            int qSize = game_queue.size();
+            char qsOut[5];
+            itoa(qSize, qsOut, 4);
+            renderText(363, 220, 0.7f, 0.7f, false, qsOut);
             if (footer != NULL)
             {
                 // Draw the footer if one is provided
