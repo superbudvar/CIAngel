@@ -15,6 +15,14 @@ extern "C" {
 
 #define MAX_TEXTURES 1024
 
+#define COLOR_BLACK 0xFF000000
+#define COLOR_BLUE 0xFFff0000
+#define COLOR_RED 0xFF0000ff
+#define COLOR_GREEN 0xFF00ff80
+#define COLOR_WHITE 0xFFffffff
+#define COLOR_PURPLE 0xFFd126b8
+#define COLOR_CYAN 0xFFd19426
+
 #define CLEAR_COLOR 0x00000000
 
 #define DISPLAY_TRANSFER_FLAGS \

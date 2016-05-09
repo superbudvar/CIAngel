@@ -26,9 +26,8 @@
 #include "vshader_shbin.h"
 #include "display.h"
 
-#include "utils.h"
-#include "cia.h"
-#include "data.h"
+#include "utils2.h"
+#include "DownloadQueue.h"
 
 #include "svchax/svchax.h"
 #include "common.h"
@@ -39,16 +38,12 @@
 
 
 // Vector used for download queue
-extern ConsoleMenu currentMenu;
-static const u16 top = 0x140;
 static bool bSvcHaxAvailable = true;
 static bool updateScreen = true;
 int sourceDataType;
-std::vector<game_item> game_queue;
 Json::Value sourceData;
 
 u32 kDown;
-std::stack<int> currentSelection;
 
 struct find_game_item {
     std::string titleid;
@@ -63,276 +58,7 @@ bool compareByScore(const game_item &a, const game_item &b)
     return a.score > b.score;
 }
 
-Result ConvertToCIA(std::string dir, std::string titleName)
-{
-    char cwd[1024];
-    if (getcwdir(cwd, sizeof(cwd)) == NULL){
-        printf("[!] Could not store Current Working Directory\n");
-        return -1;
-    }
-    chdir(dir.c_str());
-    FILE *tik = fopen("cetk", "rb");
-    if (!tik) return -1;
-    TIK_CONTEXT tik_context = process_tik(tik);
 
-    FILE *tmd = fopen((dir + "/tmd").c_str(),"rb");
-    if (!tmd) return -1;
-    TMD_CONTEXT tmd_context = process_tmd(tmd);
-
-    if(tik_context.result != 0 || tmd_context.result != 0){
-        printf("[!] Input files could not be processed successfully\n");
-        free(tmd_context.content_struct);
-        fclose(tik);
-        fclose(tmd);
-        return -1;
-    }
-
-    chdir(cwd);
-
-    int result;
-    if (selected_mode == install_direct)
-    {
-        result = install_cia(tmd_context, tik_context);
-    }
-    else
-    {
-        FILE *output = fopen((dir + "/" + titleName + ".cia").c_str(),"wb");
-        if (!output) return -2;
-
-        result = generate_cia(tmd_context, tik_context, output);
-        if(result != 0){
-            remove((dir + "/" + titleName + ".cia").c_str());
-        }
-    }
-
-    return result;
-}
-
-std::string u32_to_hex_string(u32 i)
-{
-    std::stringstream stream;
-    stream << std::setfill ('0') << std::setw(sizeof(u32)*2) << std::hex << i;
-    return stream.str();
-}
-
-int mkpath(std::string s,mode_t mode)
-{
-    size_t pre=0,pos;
-    std::string dir;
-    int mdret = 0;
-
-    if(s[s.size()-1]!='/'){
-        // force trailing / so we can handle everything in loop
-        s+='/';
-    }
-
-    while((pos=s.find_first_of('/',pre))!=std::string::npos){
-        dir=s.substr(0,pos++);
-        pre=pos;
-        if(dir.size()==0) continue; // if leading / first time is 0 length
-        if((mdret=mkdir(dir.c_str(),mode)) && errno!=EEXIST){
-            return mdret;
-        }
-    }
-    return mdret;
-}
-
-char parse_hex(char c)
-{
-    if ('0' <= c && c <= '9') return c - '0';
-    if ('A' <= c && c <= 'F') return c - 'A' + 10;
-    if ('a' <= c && c <= 'f') return c - 'a' + 10;
-    std::abort();
-}
-
-char* parse_string(const std::string & s)
-{
-    char* buffer = new char[s.size() / 2];
-    for (std::size_t i = 0; i != s.size() / 2; ++i)
-        buffer[i] = 16 * parse_hex(s[2 * i]) + parse_hex(s[2 * i + 1]);
-    return buffer;
-}
-
-std::string get_file_contents(const char *filename)
-{
-  std::ifstream in(filename, std::ios::in | std::ios::binary);
-  if (in)
-  {
-    return(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
-  }
-  throw(errno);
-}
-
-void CreateTicket(std::string titleId, std::string encTitleKey, char* titleVersion, std::string outputFullPath)
-{
-    std::ofstream ofs;
-
-    ofs.open(outputFullPath, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
-    ofs.write(tikTemp, 0xA50);
-    ofs.close();
-
-    ofs.open(outputFullPath, std::ofstream::out | std::ofstream::in | std::ofstream::binary);
-
-    //write version
-    ofs.seekp(top+0xA6, std::ios::beg);
-    ofs.write(titleVersion, 0x2);
-
-    //write title id
-    ofs.seekp(top+0x9C, std::ios::beg);
-    ofs.write(parse_string(titleId), 0x8);
-
-    //write key
-    ofs.seekp(top+0x7F, std::ios::beg);
-    ofs.write(parse_string(encTitleKey), 0x10);
-
-    ofs.close();
-}
-
-void InstallTicket(std::string FullPath)
-{
-    Handle hTik;
-    u32 writtenbyte;
-    AM_InstallTicketBegin(&hTik);
-    std::string curr = get_file_contents(FullPath.c_str());
-    FSFILE_Write(hTik, &writtenbyte, 0, curr.c_str(), 0x100000, 0);
-    AM_InstallTicketFinish(hTik);
-    printf("Ticket Installed.");
-    //delete temp ticket, ticket folder still exists... ugly. later stream directly to the handle
-    remove(FullPath.c_str());
-}
-
-Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string titleName)
-{
-    // Wait for wifi to be available
-    u32 wifi = 0;
-    Result ret;
-    while(R_SUCCEEDED(ret = ACU_GetWifiStatus(&wifi)) && wifi == 0)
-    {
-        hidScanInput();
-        if (hidKeysDown() & KEY_B)
-        {
-            ret = -1;
-            break;
-        }
-    }
-
-    if (R_FAILED(ret))
-    {
-        printf("Unable to access internet.\n");
-        return ret;
-    }
-
-    std::string outputDir = "/CIAngel";
-
-    if (titleName.length() == 0)
-    {
-        titleName = titleId;
-    }
-
-    std::string mode_text;
-    if(selected_mode == make_cia){
-        mode_text = "create";
-    }
-    else if(selected_mode == install_direct){
-        mode_text = "install";
-    }
-
-
-    printf("Starting - %s\n", titleName.c_str());
-
-    mkpath((outputDir + "/tmp/").c_str(), 0777);
-
-    // Make sure the CIA doesn't already exist
-    std::string cp = outputDir + "/" + titleName + ".cia";
-    char *ciaPath = new char[cp.size()+1];
-    ciaPath[cp.size()]=0;
-    memcpy(ciaPath,cp.c_str(),cp.size());
-    if ( (selected_mode == make_cia) && FileExists(ciaPath))
-    {
-        free(ciaPath);
-        printf("%s/%s.cia already exists.\n", outputDir.c_str(), titleName.c_str());
-        return 0;
-    }
-    free(ciaPath);
-
-    std::ofstream ofs;
-
-    FILE *oh = fopen((outputDir + "/tmp/tmd").c_str(), "wb");
-    if (!oh) 
-    {
-        printf("Error opening %s/tmp/tmd\n", outputDir.c_str());
-        return -1;
-    }
-    Result res = DownloadFile((NUS_URL + titleId + "/tmd").c_str(), oh, false);
-    fclose(oh);
-    if (res != 0)
-    {
-        printf("Could not download TMD. Internet/Title ID is OK?\n");
-        return res;
-    }
-
-    //read version
-    std::ifstream tmdfs;
-    tmdfs.open(outputDir + "/tmp/tmd", std::ofstream::out | std::ofstream::in | std::ofstream::binary);
-    char titleVersion[2];
-    tmdfs.seekg(top+0x9C, std::ios::beg);
-    tmdfs.read(titleVersion, 0x2);
-    tmdfs.close();
-
-    CreateTicket(titleId, encTitleKey, titleVersion, outputDir + "/tmp/cetk");
-
-    printf("Now %s the CIA...\n", mode_text.c_str());
-
-    res = ConvertToCIA(outputDir + "/tmp", titleName);
-    if (res != 0)
-    {
-        printf("Could not %s the CIA.\n", mode_text.c_str());
-        return res;
-    }
-
-    if (selected_mode == make_cia)
-    {
-        rename((outputDir + "/tmp/" + titleName + ".cia").c_str(), (outputDir + "/" + titleName + ".cia").c_str());
-    }
-
-    printf(" DONE!\n");
-
-    // TODO remove tmp dir
-
-    return res;
-}
-
-void ProcessGameQueue()
-{
-    // Create the tickets folder if we're in ticket mode
-    char empty_titleVersion[2] = {0x00, 0x00};
-    if (selected_mode == install_ticket)
-    {
-        mkpath("/CIAngel/tickets/", 0777); 
-    }
-
-    std::vector<game_item>::iterator game = game_queue.begin();
-    while(aptMainLoop() && game != game_queue.end())
-    {
-        std::string selected_titleid = (*game).titleid;
-        std::string selected_enckey = (*game).titlekey;
-        std::string selected_name = (*game).norm_name;
-
-        if (selected_mode == install_ticket)
-        {
-            CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tickets/" + selected_name + ".tik");
-            InstallTicket("/CIAngel/tickets/" + selected_name + ".tik");
-        }
-        else
-        {
-            DownloadTitle(selected_titleid, selected_enckey, selected_name);
-        }
-
-        game = game_queue.erase(game);
-    }
-
-    wait_key_specific("Press A to continue.\n", KEY_A);
-}
 
 std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
 {
@@ -384,78 +110,24 @@ std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
     return input;
 }
 
-void removeForbiddenChar(std::string* s, bool onlyCR = false)
-{
-    std::string::iterator it;
-    std::string illegalChars = "\n";
-    if(!onlyCR) {
-        illegalChars = "\n\\/:?\"<>|";
-    }
-    for (it = s->begin() ; it < s->end() ; ++it){
-        bool found = illegalChars.find(*it) != std::string::npos;
-        if(found)
-        {
-            *it = ' ';
-        }
-    }
-}
-
-std::istream& GetLine(std::istream& is, std::string& t)
-{
-    t.clear();
-    std::istream::sentry se(is, true);
-    std::streambuf* sb = is.rdbuf();
-
-    for (;;) {
-        int c = sb->sbumpc();
-        switch (c) {
-            case '\n':
-              return is;
-            case '\r':
-              if (sb->sgetc() == '\n')
-                sb->sbumpc();
-              return is;
-            case  EOF:
-              if (t.empty())
-                is.setstate(std::ios::eofbit);
-              return is;
-            default:
-              t += (char)c;
-        }
-    }
-}
-
-u64 hex_to_u64( std::string value) {
-    u64 out;
-    std::istringstream(value) >> std::hex >> out;
-    return out;
-}
-
-std::string ToHex(const std::string& s)
-{
-    std::ostringstream ret;
-    for (std::string::size_type i = 0; i < s.length(); ++i)
-    {
-        int z = s[i]&0xff;
-        ret << std::hex << std::setfill('0') << std::setw(2) << z;
-    }
-    return ret.str();
-}
-
 void load_JSON_data() 
 {
-    setTextColor(COLOR_FOOTER);
-    renderText(0,0, 1.0f, 1.0f, false, "loading wings.json...");
-    sceneDraw();
-    std::ifstream ifs("/CIAngel/wings.json");
-    Json::Reader reader;
-    Json::Value obj;
-    reader.parse(ifs, sourceData);
-    
-    if(sourceData[0]["titleID"].isString()) {
-      sourceDataType = JSON_TYPE_ONLINE;
-    } else if (sourceData[0]["titleid"].isString()) {
-      sourceDataType = JSON_TYPE_WINGS;
+    struct stat s_tmp;
+    sourceDataType = JSON_TYPE_NONE;
+    if(stat("/CIAngel/wings.json", &s_tmp) == 0) {
+        setTextColor(COLOR_FOOTER);
+        renderText(0,0, 1.0f, 1.0f, false, "loading wings.json...");
+        sceneDraw();
+        std::ifstream ifs("/CIAngel/wings.json");
+        Json::Reader reader;
+        Json::Value obj;
+        reader.parse(ifs, sourceData);
+        
+        if(sourceData[0]["titleID"].isString()) {
+          sourceDataType = JSON_TYPE_ONLINE;
+        } else if (sourceData[0]["titleid"].isString()) {
+          sourceDataType = JSON_TYPE_WINGS;
+        }
     }
 }
 
@@ -489,7 +161,7 @@ bool menu_search_keypress(int selected, u32 key, void* data)
 
         printf("OK - %s\n", selected_name.c_str());
         //removes any problem chars, not sure if whitespace is a problem too...?
-        removeForbiddenChar(&selected_name);
+        removeForbiddenChar(&selected_name, false);
 
         if(selected_mode == install_ticket){
             char empty_titleVersion[2] = {0x00, 0x00};
@@ -533,6 +205,13 @@ bool menu_search_keypress(int selected, u32 key, void* data)
 /* Menu Action Functions */
 void action_search()
 {
+    consoleClear();
+    
+    if(sourceDataType == JSON_TYPE_NONE) {
+        printf("You can't fly without wings.\n\nPress any key to continue\n");
+        wait_key();
+        return;
+    }
     HB_Keyboard sHBKB;
     bool bKBCancelled = false;
 
@@ -574,6 +253,7 @@ void action_search()
             removeForbiddenChar(&item.name, true);
             item.norm_name = (const char*)szName;
             item.region = sourceData[i]["region"].asString();
+            item.installed = false;
             switch(sourceDataType) {
             case JSON_TYPE_WINGS:
               item.titleid = sourceData[i]["titleid"].asString();
@@ -585,6 +265,14 @@ void action_search()
               item.titlekey = sourceData[i]["encTitleKey"].asString();
               item.code = sourceData[i]["serial"].asString();
               break;
+            }
+            if( bSvcHaxAvailable ) {
+                u64 titleId = hex_to_u64(item.titleid);  
+                FS_MediaType mediaType = ((titleId >> 32) & 0x8010) != 0 ? MEDIATYPE_NAND : MEDIATYPE_SD;
+                Result res = 0;
+                if( R_SUCCEEDED(res = AM_GetTitleProductCode(mediaType, titleId, nullptr)) ) {
+                    item.installed = true;
+                }
             }
             std::string typeCheck = item.titleid.substr(4,4);
             //if title id belongs to gameapp/dlc/update/dsiware, use it. if not, ignore. case sensitve of course
@@ -645,6 +333,10 @@ void action_prompt_queue()
     }
 
     printf("Queue contains %d items.\n", game_queue.size());
+    for(int i=0; i< game_queue.size(); ++i) {
+        printf("%i; %s\n", i+1, game_queue[i].norm_name.c_str() );
+    }
+
     printf("Press A to %s queue.\n", mode_text.c_str());
     printf("Press B to return to menu.\n");
     printf("Press X to clear queue.\n");
@@ -783,12 +475,13 @@ void action_about()
 {
     consoleClear();
 
-    printf(CONSOLE_RED "CIAngel by cearp and Drakia\n" CONSOLE_RESET);
+    printf(CONSOLE_RED "CIAngel by cearp and Drakia\n");
+    printf( CONSOLE_RESET);
     printf("Download, create and install CIAs\n");
     printf("directly from Nintendo's CDN servers.\n");
     printf("Grabbing the latest games has never been");
     printf("so easy.\n");
-    setTextColor(0xFF0000FF);
+    setTextColor(COLOR_RED);
     renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
     setTextColor(0xFFCCCCCC);
     renderText(0, 32, 0.6f, 0.6f, false, "Download, create and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
@@ -878,18 +571,17 @@ void menu_main()
 
     while (!bExit && aptMainLoop())
     {
-//        if(updateScreen) {
-            updateScreen = false;
-            gspWaitForVBlank();
-            sceneDraw();
-            gfxFlushBuffers();
-            gfxSwapBuffers();
-            clear_screen(GFX_BOTTOM);
-//        }
         //Wait for VBlank
         
         // We have to update the footer every draw, incase the user switches install mode or region
         sprintf(footer, "(L):Install Mode (R):Region |  Queue: %d", game_queue.size());
+
+        menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
+//        if(updateScreen) {
+            updateScreen = false;
+            sceneDraw();
+            clear_screen(GFX_BOTTOM);
+//        }
 
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
 
@@ -916,9 +608,6 @@ int main(int argc, const char* argv[])
     }
 
     u32 *soc_sharedmem, soc_sharedmem_size = 0x100000;
-    gfxInitDefault();
-    consoleInit(GFX_BOTTOM, NULL);
-
     httpcInit(0);
     soc_sharedmem = (u32 *)memalign(0x1000, soc_sharedmem_size);
     socInit(soc_sharedmem, soc_sharedmem_size);
@@ -926,22 +615,26 @@ int main(int argc, const char* argv[])
     hidInit();
     acInit();
 
+    gfxInitDefault();
+    consoleInit(GFX_BOTTOM,NULL); 
+    init_menu(GFX_BOTTOM);
+    sceneInit();
+
     if (bSvcHaxAvailable)
     {
         amInit();
         AM_InitializeExternalTitleDatabase(false);
     }
     // Initialize the scene
-    sceneInit();
     sceneRender(1.0f);
     sceneDraw();
-    init_menu(GFX_BOTTOM);
 
     // Make sure /CIAngel exists on the SD card
     mkpath("/CIAngel", 0777);
     
     // Set up the reading of json
     check_JSON();
+    printf("load JSON\n");
     load_JSON_data();
     
     menu_main();

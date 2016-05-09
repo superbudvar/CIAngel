@@ -4,10 +4,8 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
-#include <cstdlib>
 
 #include "common.h"
-#include "utils.h"
 #include "display.h"
 
 int selected_options[MAX_SELECTED_OPTIONS];
@@ -38,8 +36,8 @@ void ui_menu_draw_string(const char* str, int pos_x, int pos_y, u32 color)
 }
 
 void ui_menu_draw(const char *title, const char* footer, int back, int count, const char *options[]) {
-    setTextColor(0xFF00FF00);
-    renderText(0, 8, 0.7f, 0.7f, false, title);
+    setTextColor(COLOR_GREEN);
+    renderText(0, TOP_SCREEN_HEIGHT-20, 0.7f, 0.7f, false, title);
     for (int i = 0; i < count && i < (currentMenu.menuConsole.consoleHeight - 2); i++) {
         ui_menu_draw_string(options[i], 1, 32+(i*12), 0xFF000000);
         //ui_menu_draw_string(options[i], 1, 32+(i*12), i==current? 0xFF0000FF: 0xFF000000);
@@ -102,16 +100,23 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
                 u64 color = COLOR_MENU_ITEM;
                 if(i+menu_offset == current) {
                     color = COLOR_SELECTED;
+                } else if((*options)[i+menu_offset].installed) {
+                    color = COLOR_MENU_INSTALLED;
                 }
                 ui_menu_draw_string((*options)[menu_offset+i].region.c_str(), 1, y_pos, color);
                 ui_menu_draw_string((*options)[menu_offset+i].name.c_str(), 32, y_pos, color);
                 current_pos_y++;
             }
             consoleClear();
-            printf("Title: %s\nRegion: %s\ncode: %s\n",
+            printf("Title: %s\nRegion: %s\ncode: %s\nTitle/Ticket Installed: ",
                         (*options)[current].norm_name.c_str(),
                         (*options)[current].region.c_str(),
                         (*options)[current].code.c_str());
+            if((*options)[current].installed) {
+                printf("yes\n");
+            } else {
+                printf("no\n");
+            }
             if (footer != NULL)
             {
                 // Draw the footer if one is provided
@@ -158,7 +163,8 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
     PrintConsole* currentConsole = consoleSelect(&currentMenu.menuConsole);
 
     int current = 0;
-    int previous_index = 1;
+    bool firstLoop = true;
+    int previous_index = 0;
     int menu_offset = 0;
     int menu_pos_y;
     int menu_end_y = 18; 
@@ -176,7 +182,8 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
             mode_text = "Create Ticket";
         }
 
-        if(previous_index != current) {
+        if(firstLoop || previous_index != current) {
+            firstLoop = false;
             int results_per_page = menu_end_y - menu_pos_y;
             int current_page = current / results_per_page;
             menu_offset = current_page * results_per_page;
@@ -190,12 +197,7 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
             for (int i = 0; (menu_offset + i) < count && i < results_per_page; i++) {
                 int y_pos = 32+(i*12);
                 u64 color = COLOR_MENU_ITEM;
-                if(i+menu_offset == current) {
-                    menu_draw_string(options[menu_offset + i], 1, current_pos_y, CONSOLE_REVERSE);
-                    color = COLOR_SELECTED;
-                } else {
-                    menu_draw_string(options[menu_offset + i], 1, current_pos_y, CONSOLE_WHITE);
-                }
+                if(i+menu_offset == current) color = COLOR_SELECTED;
                 ui_menu_draw_string(options[menu_offset+i], 1, y_pos, color);
                 current_pos_y++;
             }

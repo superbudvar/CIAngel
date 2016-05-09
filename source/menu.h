@@ -3,38 +3,30 @@
 #ifndef __MENU_H_INCLUDED__
 #define __MENU_H_INCLUDED__
 #include <3ds.h>
+#include <citro3d.h>
 #include <string>
 #include <vector>
 #include <stdio.h>
 #include "common.h"
+#include "DownloadQueue.h"
 
 #include <stdint.h>
 #include <stddef.h>
 
 #define MAX_SELECTED_OPTIONS 0x10
 
-#define COLOR_TITLE 0xFF0000ff
-#define COLOR_NEUTRAL 0xFFffffff
-#define COLOR_MENU_ITEM 0xFFffffff
-#define COLOR_SELECTED 0xFF00ff00
-#define COLOR_FOOTER 0xFFd126b8
-#define COLOR_FOOTER_SELECTED 0xFFd19426
-#define COLOR_BACKGROUND 0xFF000000
+
+#define COLOR_TITLE COLOR_RED
+#define COLOR_NEUTRAL COLOR_WHITE
+#define COLOR_MENU_ITEM COLOR_WHITE
+#define COLOR_MENU_INSTALLED 0xFFff0080
+#define COLOR_SELECTED COLOR_GREEN
+#define COLOR_FOOTER COLOR_PURPLE
+#define COLOR_FOOTER_SELECTED COLOR_CYAN
+#define COLOR_BACKGROUND COLOR_BLACK
 
 #define CONSOLE_REVERSE		CONSOLE_ESC(7m)
 
-typedef struct {
-  int score;
-  int index;
-  std::string titleid;
-  std::string titlekey;
-  std::string name;
-  std::string norm_name;
-  std::string region;
-  std::string code;
-} game_item;
-
-extern std::vector<game_item> game_queue;
 
 void init_menu(gfxScreen_t screen);
 void ui_menu_draw_string(const char* str, int pos_x, int pos_y, u32 color);

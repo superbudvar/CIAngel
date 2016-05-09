@@ -25,6 +25,7 @@ along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
 // Check for updates every 3 days automatically?
 #define JSON_UPDATE_INTERVAL_IN_SECONDS (60 * 60 * 24 * 3)
 
+#define JSON_TYPE_NONE 0
 #define JSON_TYPE_WINGS 1
 #define JSON_TYPE_ONLINE 2
 

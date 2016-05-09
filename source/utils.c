@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with make_cdn_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "lib.h"
-
 //MISC
 void char_to_int_array(unsigned char destination[], char source[], int size, int endianness, int base)
 {	
@@ -114,10 +113,12 @@ void PrintProgress(u32 nSize, u32 nCurrent)
 {
 	// Don't attempt to calculate anything if we don't have a final size
 	if (nSize == 0) return;
+    setTextColor(COLOR_GREEN);
+    renderText(0, 8, 0.7f, 0.7f, false, "downlading");
 	
 	// Calculate percent and bar width
 	double fPercent = ((double)nCurrent / nSize) * 100.0;
-	u16 barDrawWidth = (fPercent / 100) * 40;
+	u16 barDrawWidth = (fPercent / 100) * 30;
 
 	int i = 0;
 	printf("% 3.2f%% ", fPercent);
@@ -261,7 +262,6 @@ Result DownloadFile_Internal(const char *url, void *out, bool bProgress,
     u32 bufSize = 0x100000;
     u32 readSize = 0;
     httpcOpenContext(&context, HTTPC_METHOD_GET, (char*)url, 1);
-
     ret = httpcBeginRequest(&context);
     if (ret != 0) goto _out;
 
@@ -278,6 +278,10 @@ Result DownloadFile_Internal(const char *url, void *out, bool bProgress,
     if (ret != 0) goto _out;
 
     {
+        if(fileSize>bufSize) {
+  //          printf("fileSize: %i too big for buffer %i", fileSize, bufSize);
+        }
+//        printf("fileSize: %i buffer %i", fileSize, bufSize);
         unsigned char *buffer = (unsigned char *)linearAlloc(bufSize);
         if (buffer == NULL)
         {
@@ -545,13 +549,10 @@ void clear_screen(gfxScreen_t screen)
 }
 
 bool download_JSON() {
-  printf("\nAttempting to download JSON...\n");
-  
   remove("/CIAngel/wings.json.tmp");
   FILE *oh = fopen("/CIAngel/wings.json.tmp", "wb");
-  
   if (oh) {
-    Result res = DownloadFile(JSON_URL, oh, false);
+    Result res = DownloadFile(JSON_URL, oh, true);
     int size = ftell(oh);
     fclose(oh);
     if (res == 0 && size >= 0) {
@@ -577,13 +578,14 @@ bool check_JSON() {
       double age_days = age_seconds / (60 * 60 * 24);
 
       if (age_seconds > JSON_UPDATE_INTERVAL_IN_SECONDS) {
-        printf("Your wings.json is %d days old\n\n", (int)age_days);
-        printf("Press A to update, or any other key to skip.\n");
+        char buf[255];
+        sprintf(buf, "Your wings.json is %d days old\n\nPress A to update, or any other key to skip.\n", (int)age_days);
+        setTextColor(COLOR_GREEN);
+        renderText(0, 0, 0.5f, 0.5f, true, buf);
+        printf(buf);
         //Wait for VBlank
         gspWaitForVBlank();
         sceneDraw();
-        gfxFlushBuffers();
-        gfxSwapBuffers();
 
         u32 keys = wait_key();
 
@@ -593,11 +595,11 @@ bool check_JSON() {
         return true;
       }
     } else {
-        setTextColor(0xFF00FF00);
-        renderText(150,50, 1.0f, 1.0f, false, "No wings.json");
-
-      printf("\nPress A to Download, or any other key to return.\n");
-      u32 keys = wait_key();
+        setTextColor(COLOR_GREEN);
+        renderText(350,0, 0.4f, 0.4f, false, "No wings.json");
+        sceneDraw();
+        printf("\nPress A to Download, or any other key to return.\n");
+        u32 keys = wait_key();
       
       if (keys & KEY_A) {
         return download_JSON();
@@ -608,4 +610,3 @@ bool check_JSON() {
 
     return true;
 }
-
