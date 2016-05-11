@@ -368,7 +368,6 @@ void action_manual_entry()
 {
     HB_Keyboard sHBKB;
     bool bKBCancelled = false;
-    std::string key;
 
     consoleClear();
 
@@ -377,6 +376,7 @@ void action_manual_entry()
     {
         printf("Please enter a titleID:\n");
         std::string titleId = getInput(&sHBKB, bKBCancelled);
+        std::string key;
         if (bKBCancelled)
         {
             break;
@@ -390,15 +390,15 @@ void action_manual_entry()
                 tempKey = sourceData[i]["enckey"].asString();
             }
 
-            if(tempId.compare(titleId) == 0 && tempKey.size() == 32) {
+            if(tempId.compare(titleId) == 0 && tempKey.length() == 32) {
                printf("Found encTitleKey, proceeding automatically\n"); 
                key = tempKey;
                break;
             }
         }
-        if(key.size() != 32) {
+        if(key.length() != 32) {
             printf("Please enter the corresponding encTitleKey:\n");
-            std::string key = getInput(&sHBKB, bKBCancelled);
+            key = getInput(&sHBKB, bKBCancelled);
             if (bKBCancelled)
             {
                 break;
@@ -411,8 +411,14 @@ void action_manual_entry()
             break;
         }
         else
-        {
-            printf("encTitleKeys are 32 characters long,\nand titleIDs are 16 characters long.\n");
+        {   
+            printf("There was an error in you input:\n");  
+            if(titleId.length() != 16) {
+                printf("titleIDs are 16 chars long, not %i\n", titleId.length());
+            }
+            if(key.length() != 32) {
+                printf("encTitleKeys are 32 chars long, not %i\n", key.length());
+            }
         }
     }
 }
