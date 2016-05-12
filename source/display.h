@@ -21,7 +21,6 @@ extern "C" {
 #define TEXTURE_FLAG_JPN 4
 #define TEXTURE_FLAG_ALL 5
 
-
 #define COLOR_BLACK 0xFF000000
 #define COLOR_BLUE 0xFFff0000
 #define COLOR_RED 0xFF0000ff
@@ -32,25 +31,25 @@ extern "C" {
 
 #define CLEAR_COLOR 0x00000000
 
-#define DISPLAY_TRANSFER_FLAGS \
-    (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
-    GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
-    GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+#define DISPLAY_TRANSFER_FLAGS                                                                                                     \
+    (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) |                                               \
+     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) |                                 \
+     GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
 #define FONT_DEFAULT_SIZE 0.5f
 
 void sceneInit(void);
 void sceneRender(float size);
 void sceneExit(void);
-void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char* text);
+void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char *text);
 void setTextColor(u32 color);
-void sceneRenderFooter(const char* text);
+void sceneRenderFooter(const char *text);
 void screen_end_frame();
 void screen_begin_frame();
 void sceneDraw();
 void renderBG();
 void screen_draw_texture(u32 id, float x, float y, float width, float height);
-void screen_get_texture_size(u32* width, u32* height, u32 id);
+void screen_get_texture_size(u32 *width, u32 *height, u32 id);
 #ifdef __cplusplus
 }
 #endif

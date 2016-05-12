@@ -14,39 +14,35 @@ void init_menu(gfxScreen_t screen)
 {
     // Create our new console, initialize it, and switch back to the previous console
     currentMenu.menuConsole = *consoleGetDefault();
-    PrintConsole* currentConsole = consoleSelect(&currentMenu.menuConsole);
+    PrintConsole *currentConsole = consoleSelect(&currentMenu.menuConsole);
     consoleInit(screen, &currentMenu.menuConsole);
 
     consoleSelect(currentConsole);
 }
 
-
-void menu_draw_string(const char* str, int pos_x, int pos_y, const char* color)
+void menu_draw_string(const char *str, int pos_x, int pos_y, const char *color)
 {
     currentMenu.menuConsole.cursorX = pos_x;
     currentMenu.menuConsole.cursorY = pos_y;
-    
+
     gfxFlushBuffers();
 }
 
-void ui_menu_draw_string(const char* str, int pos_x, int pos_y, float fontSize, u32 color)
+void ui_menu_draw_string(const char *str, int pos_x, int pos_y, float fontSize, u32 color)
 {
     setTextColor(color); // black
     renderText(pos_x, pos_y, fontSize, fontSize, false, str);
 }
 
-void menu_draw_string_full(const char* str, int pos_y, const char* color)
+void menu_draw_string_full(const char *str, int pos_y, const char *color)
 {
     currentMenu.menuConsole.cursorX = 0;
     currentMenu.menuConsole.cursorY = pos_y;
     printf(color);
 
-    if (currentMenu.menuConsole.consoleWidth == 50)
-    {
+    if (currentMenu.menuConsole.consoleWidth == 50) {
         printf("%-50s", str);
-    }
-    else
-    {
+    } else {
         printf("%-40s", str);
     }
     printf(CONSOLE_RESET);
@@ -54,13 +50,13 @@ void menu_draw_string_full(const char* str, int pos_y, const char* color)
     gfxFlushBuffers();
 }
 
-void titles_multkey_draw(const char *title, const char* footer, int back, std::vector<game_item> *options, void* data,
-                      bool (*callback)(int result, u32 key, void* data))
+void titles_multkey_draw(const char *title, const char *footer, int back, std::vector<game_item> *options, void *data,
+                         bool (*callback)(int result, u32 key, void *data))
 
 {
     // Select our menu console and clear the screen
-    PrintConsole* currentConsole = consoleSelect(&currentMenu.menuConsole);
-    
+    PrintConsole *currentConsole = consoleSelect(&currentMenu.menuConsole);
+
     int count = options->size();
     int current = 0;
     bool firstLoop = true;
@@ -73,57 +69,54 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
     int text_offset_x = 20;
     int menuLineHeight = (menuFontSize * fontGetInfo()->lineFeed);
     int results_per_page = (TOP_SCREEN_HEIGHT - 18) / (menuLineHeight);
-//    screen_get_texture_size(&topScreenBgWidth, &topScreenBgHeight, TEXTURE_SCREEN_TOP_SPLASH_BG);
+    //    screen_get_texture_size(&topScreenBgWidth, &topScreenBgHeight, TEXTURE_SCREEN_TOP_SPLASH_BG);
 
     while (!bExit && aptMainLoop()) {
-        if(firstLoop || previous_index != current) {
+        if (firstLoop || previous_index != current) {
             screen_begin_frame();
             firstLoop = false;
             int current_page = current / results_per_page;
             menu_offset = current_page * results_per_page;
-            current_pos_y=0;
+            current_pos_y = 0;
             // Draw the header
-            ui_menu_draw_string(title, 0, 0, 0.7f, COLOR_TITLE);  
+            ui_menu_draw_string(title, 0, 0, 0.7f, COLOR_TITLE);
             menu_pos_y = current_pos_y;
             for (int i = 0; menu_offset + i < count && i < results_per_page; i++) {
-                int y_pos = 18+(i*menuLineHeight);
+                int y_pos = 18 + (i * menuLineHeight);
                 u64 color = COLOR_MENU_ITEM;
-                if(i+menu_offset == current) {
+                if (i + menu_offset == current) {
                     color = COLOR_SELECTED;
-                } else if((*options)[i+menu_offset].installed) {
+                } else if ((*options)[i + menu_offset].installed) {
                     color = COLOR_MENU_INSTALLED;
                 }
-                
+
                 u32 flagWidth = 0;
                 u32 flagHeight = 0;
                 int flagType;
-                std::string region = (*options)[menu_offset+i].region; 
+                std::string region = (*options)[menu_offset + i].region;
                 flagType = TEXTURE_FLAG_ALL;
-                if( region == "EUR") {
+                if (region == "EUR") {
                     flagType = TEXTURE_FLAG_EUR;
-                } else if ( region == "USA" ) {
+                } else if (region == "USA") {
                     flagType = TEXTURE_FLAG_USA;
-                } else if ( region == "JPN" ) {
+                } else if (region == "JPN") {
                     flagType = TEXTURE_FLAG_JPN;
-                }    
+                }
                 screen_get_texture_size(&flagWidth, &flagHeight, flagType);
-//                ui_menu_draw_string( region.c_str(), 1, y_pos, menuFontSize, color);
+                //                ui_menu_draw_string( region.c_str(), 1, y_pos, menuFontSize, color);
                 screen_draw_texture(flagType, 0, y_pos, flagWidth, flagHeight);
-                ui_menu_draw_string((*options)[menu_offset+i].name.c_str(), text_offset_x, y_pos, menuFontSize, color);
+                ui_menu_draw_string((*options)[menu_offset + i].name.c_str(), text_offset_x, y_pos, menuFontSize, color);
                 current_pos_y++;
             }
             consoleClear();
-            printf("Title: %s\nRegion: %s\ncode: %s\nTitle/Ticket Installed: ",
-                        (*options)[current].norm_name.c_str(),
-                        (*options)[current].region.c_str(),
-                        (*options)[current].code.c_str());
-            if((*options)[current].installed) {
+            printf("Title: %s\nRegion: %s\ncode: %s\nTitle/Ticket Installed: ", (*options)[current].norm_name.c_str(),
+                   (*options)[current].region.c_str(), (*options)[current].code.c_str());
+            if ((*options)[current].installed) {
                 printf("yes\n");
             } else {
                 printf("no\n");
             }
-            if (footer != NULL)
-            {
+            if (footer != NULL) {
                 // Draw the footer if one is provided
                 current_pos_y = currentMenu.menuConsole.consoleHeight - 1;
                 menu_draw_string_full(footer, current_pos_y, CONSOLE_BLUE CONSOLE_REVERSE);
@@ -132,7 +125,7 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
             screen_end_frame();
         }
         u32 key = wait_key();
-        
+
         if (key & KEY_UP) {
             if (current <= 0) {
                 current = count - 1;
@@ -147,10 +140,12 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
             }
         } else if (key & KEY_RIGHT) {
             current += 5;
-            if (current >= count) current = count - 1;
+            if (current >= count)
+                current = count - 1;
         } else if (key & KEY_LEFT) {
             current -= 5;
-            if (current < 0) current = 0;
+            if (current < 0)
+                current = 0;
         } else if (callback(current, key, data)) {
             break;
         }
@@ -160,19 +155,19 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
     consoleSelect(currentConsole);
 }
 
-void menu_multkey_draw(const char *title, const char* footer, int back, int count, const char *options[], void* data,
-                      bool (*callback)(int result, u32 key, void* data))
+void menu_multkey_draw(const char *title, const char *footer, int back, int count, const char *options[], void *data,
+                       bool (*callback)(int result, u32 key, void *data))
 
 {
     // Select our menu console and clear the screen
-    PrintConsole* currentConsole = consoleSelect(&currentMenu.menuConsole);
+    PrintConsole *currentConsole = consoleSelect(&currentMenu.menuConsole);
 
     int current = 0;
     bool firstLoop = true;
     int previous_index = 0;
     int menu_offset = 0;
     int menu_pos_y;
-    int menu_end_y = 18; 
+    int menu_end_y = 18;
     int current_pos_y = 0;
     float menuFontSize = 0.5f;
     int menuLineHeight = (menuFontSize * fontGetInfo()->lineFeed);
@@ -180,31 +175,30 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
 
     while (!bExit && aptMainLoop()) {
         std::string mode_text;
-        if(selected_mode == make_cia) {
+        if (selected_mode == make_cia) {
             mode_text = "Create CIA";
-        }
-        else if (selected_mode == install_direct) {
+        } else if (selected_mode == install_direct) {
             mode_text = "Install CIA";
-        }
-        else if (selected_mode == install_ticket) {
+        } else if (selected_mode == install_ticket) {
             mode_text = "Create Ticket";
         }
 
-        if(firstLoop || previous_index != current) {
+        if (firstLoop || previous_index != current) {
             screen_begin_frame();
             firstLoop = false;
             int current_page = current / results_per_page;
             menu_offset = current_page * results_per_page;
-            current_pos_y=0;
+            current_pos_y = 0;
             consoleClear();
             // Draw the header
-            ui_menu_draw_string(title, 0, 0, 0.7f, COLOR_TITLE);  
+            ui_menu_draw_string(title, 0, 0, 0.7f, COLOR_TITLE);
             menu_pos_y = current_pos_y;
             for (int i = 0; (menu_offset + i) < count && i < results_per_page; i++) {
-                int y_pos = 32+(i*menuLineHeight);
+                int y_pos = 32 + (i * menuLineHeight);
                 u64 color = COLOR_MENU_ITEM;
-                if(i+menu_offset == current) color = COLOR_SELECTED;
-                ui_menu_draw_string(options[menu_offset+i], 15, y_pos, menuFontSize, color);
+                if (i + menu_offset == current)
+                    color = COLOR_SELECTED;
+                ui_menu_draw_string(options[menu_offset + i], 15, y_pos, menuFontSize, color);
                 current_pos_y++;
             }
             setTextColor(COLOR_FOOTER);
@@ -218,8 +212,7 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
             char qsOut[5];
             itoa(qSize, qsOut, 4);
             renderText(363, 220, 0.7f, 0.7f, false, qsOut);
-            if (footer != NULL)
-            {
+            if (footer != NULL) {
                 // Draw the footer if one is provided
                 current_pos_y = currentMenu.menuConsole.consoleHeight - 1;
                 menu_draw_string_full(footer, current_pos_y, CONSOLE_BLUE CONSOLE_REVERSE);
@@ -227,9 +220,9 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
             previous_index = current;
             screen_end_frame();
         }
-        
+
         u32 key = wait_key();
-        
+
         if (key & KEY_UP) {
             if (current <= 0) {
                 current = count - 1;
@@ -244,10 +237,12 @@ void menu_multkey_draw(const char *title, const char* footer, int back, int coun
             }
         } else if (key & KEY_RIGHT) {
             current += 5;
-            if (current >= count) current = count - 1;
+            if (current >= count)
+                current = count - 1;
         } else if (key & KEY_LEFT) {
             current -= 5;
-            if (current < 0) current = 0;
+            if (current < 0)
+                current = 0;
         } else if (callback(current, key, data)) {
             break;
         }
