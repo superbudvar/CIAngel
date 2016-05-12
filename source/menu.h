@@ -29,7 +29,7 @@
 
 
 void init_menu(gfxScreen_t screen);
-void ui_menu_draw_string(const char* str, int pos_x, int pos_y, u32 color);
+void ui_menu_draw_string(const char* str, int pos_x, int pos_y, float fontSize, u32 color);
 void menu_draw_string(const char* str, int pos_x, int pos_y, const char* color);
 void menu_draw_string_full(const char* str, int pos_y, const char* color);
 void titles_multkey_draw(const char *title, const char* footer, int back, std::vector<game_item> *options, void* data,

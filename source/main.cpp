@@ -35,6 +35,7 @@
 #include "fts_fuzzy_match.h"
 #include "utf8proc/utf8proc.h"
 #include "menu.h"
+#include "stb/stb_image.h"
 
 
 // Vector used for download queue
@@ -60,7 +61,7 @@ bool compareByScore(const game_item &a, const game_item &b)
 
 
 
-std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
+std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
 {
     GSPGPU_FramebufferFormats format = gfxGetScreenFormat(GFX_BOTTOM);
     gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
@@ -70,6 +71,11 @@ std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
     u8 KBState = 4;
     std::string input;
     std::string last_input;
+                
+    // draw initial prompt
+    screen_begin_frame();
+    ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
+    screen_end_frame();
     while (KBState != 1 || input.length() == 0)
     {
         if (!aptMainLoop())
@@ -94,8 +100,10 @@ std::string getInput(HB_Keyboard* sHBKB, bool &bCancelled)
         else if (KBState != 4)
         {
             if(strcmp(last_input.c_str(),input.c_str()) != 0) {
-                ui_menu_draw_string(input.c_str(), 10, 10, COLOR_SELECTED);
-                sceneDraw();
+                screen_begin_frame();
+                ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
+                ui_menu_draw_string(input.c_str(), 10, 30, 0.5f, COLOR_WHITE);
+                screen_end_frame();
                 last_input = input;
             }
             //Wait for VBlank
@@ -115,9 +123,11 @@ void load_JSON_data()
     struct stat s_tmp;
     sourceDataType = JSON_TYPE_NONE;
     if(stat("/CIAngel/wings.json", &s_tmp) == 0) {
-        setTextColor(COLOR_FOOTER);
-        renderText(0,0, 1.0f, 1.0f, false, "loading wings.json...");
-        sceneDraw();
+        screen_begin_frame();
+        renderBG();
+        setTextColor(COLOR_BLACK);
+        renderText(0,220, 0.7f, 0.7f, false, "Loading wings.json...");
+        screen_end_frame();
         std::ifstream ifs("/CIAngel/wings.json");
         Json::Reader reader;
         Json::Value obj;
@@ -217,8 +227,7 @@ void action_search()
 
     consoleClear();
 
-    printf("Please enter text to search for:\n");
-    std::string searchString = getInput(&sHBKB, bKBCancelled);
+    std::string searchString = getInput("Please enter text to search for:",&sHBKB, bKBCancelled);
     if (bKBCancelled)
     {
         return;
@@ -375,7 +384,7 @@ void action_manual_entry()
     while(true)
     {
         printf("Please enter a titleID:\n");
-        std::string titleId = getInput(&sHBKB, bKBCancelled);
+        std::string titleId = getInput("Please enter a titleID:", &sHBKB, bKBCancelled);
         std::string key;
         if (bKBCancelled)
         {
@@ -398,7 +407,7 @@ void action_manual_entry()
         }
         if(key.length() != 32) {
             printf("Please enter the corresponding encTitleKey:\n");
-            key = getInput(&sHBKB, bKBCancelled);
+            key = getInput("Please enter the corresponding encTitleKey:", &sHBKB, bKBCancelled);
             if (bKBCancelled)
             {
                 break;
@@ -479,19 +488,20 @@ void action_toggle_region()
 
 void action_about()
 {
+    screen_begin_frame();
+    setTextColor(COLOR_RED);
+    renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
+    setTextColor(0xFFCCCCCC);
+    renderText(0, 32, 0.6f, 0.6f, false, "Download, create and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
+    screen_end_frame();
+    
     consoleClear();
-
     printf(CONSOLE_RED "CIAngel by cearp and Drakia\n");
     printf( CONSOLE_RESET);
     printf("Download, create and install CIAs\n");
     printf("directly from Nintendo's CDN servers.\n");
     printf("Grabbing the latest games has never been");
     printf("so easy.\n");
-    setTextColor(COLOR_RED);
-    renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
-    setTextColor(0xFFCCCCCC);
-    renderText(0, 32, 0.6f, 0.6f, false, "Download, create and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
-    sceneDraw();
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
@@ -585,7 +595,6 @@ void menu_main()
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
 //        if(updateScreen) {
             updateScreen = false;
-            sceneDraw();
             clear_screen(GFX_BOTTOM);
 //        }
 
@@ -596,21 +605,28 @@ void menu_main()
 
 int main(int argc, const char* argv[])
 {
-    /* Sadly svchax crashes too much, so only allow install mode when running as a CIA
+    romfsInit();
+    gfxInitDefault();
+    consoleInit(GFX_BOTTOM,NULL); 
+    sceneInit();
+    screen_begin_frame();
+    //screen_load_texture_file(TEXTURE_BOTTOM_SCREEN_BG, "bottom_screen_bg.png", true);
+    renderBG();
+    screen_end_frame();
+    // Sadly svchax crashes too much, so only allow install mode when running as a CIA
     // Trigger svchax so we can install CIAs
     if(argc > 0) {
         svchax_init(true);
         if(!__ctr_svchax || !__ctr_svchax_srv) {
             bSvcHaxAvailable = false;
-            //printf("Failed to acquire kernel access. Install mode disabled.\n");
+            printf("Failed to acquire kernel access. Install mode disabled.\n");
         }
     }
-    */
     
     // argc is 0 when running as a CIA, and 1 when running as a 3dsx
     if (argc > 0)
     {
-        bSvcHaxAvailable = false;
+   //     bSvcHaxAvailable = false;
     }
 
     u32 *soc_sharedmem, soc_sharedmem_size = 0x100000;
@@ -621,26 +637,19 @@ int main(int argc, const char* argv[])
     hidInit();
     acInit();
 
-    gfxInitDefault();
-    consoleInit(GFX_BOTTOM,NULL); 
     init_menu(GFX_BOTTOM);
-    sceneInit();
 
     if (bSvcHaxAvailable)
     {
         amInit();
         AM_InitializeExternalTitleDatabase(false);
     }
-    // Initialize the scene
-    sceneRender(1.0f);
-    sceneDraw();
 
     // Make sure /CIAngel exists on the SD card
     mkpath("/CIAngel", 0777);
     
     // Set up the reading of json
     check_JSON();
-    printf("load JSON\n");
     load_JSON_data();
     
     menu_main();

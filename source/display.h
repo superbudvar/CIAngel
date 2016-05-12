@@ -14,6 +14,13 @@ extern "C" {
 #define BOTTOM_SCREEN_HEIGHT 240
 
 #define MAX_TEXTURES 1024
+#define TEXTURE_SCREEN_TOP_SPLASH_BG 0
+#define TEXTURE_APP_BANNER 1
+#define TEXTURE_FLAG_EUR 2
+#define TEXTURE_FLAG_USA 3
+#define TEXTURE_FLAG_JPN 4
+#define TEXTURE_FLAG_ALL 5
+
 
 #define COLOR_BLACK 0xFF000000
 #define COLOR_BLUE 0xFFff0000
@@ -38,8 +45,12 @@ void sceneExit(void);
 void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char* text);
 void setTextColor(u32 color);
 void sceneRenderFooter(const char* text);
+void screen_end_frame();
+void screen_begin_frame();
 void sceneDraw();
-
+void renderBG();
+void screen_draw_texture(u32 id, float x, float y, float width, float height);
+void screen_get_texture_size(u32* width, u32* height, u32 id);
 #ifdef __cplusplus
 }
 #endif
