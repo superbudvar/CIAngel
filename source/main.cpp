@@ -110,6 +110,7 @@ std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
             //gfxFlushBuffers();
             //gfxSwapBuffers();
         }
+        gfxFlushBuffers();
         gspWaitForVBlank();
 
     }
