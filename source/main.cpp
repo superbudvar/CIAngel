@@ -323,7 +323,7 @@ void action_search()
     char footer[51];
     char header[51];
     sprintf(header, "Select a Title (found %i results)", display_amount);
-    sprintf(footer, "Press A to %s. Press X to queue.", mode_text.c_str());
+    sprintf(footer, "Press A to %s, X to queue.", mode_text.c_str());
     titles_multkey_draw(header, footer, 1, &display_output, &display_output, menu_search_keypress);
 }
 
@@ -429,6 +429,8 @@ void action_manual_entry()
             if(key.length() != 32) {
                 printf("encTitleKeys are 32 chars long, not %i\n", key.length());
             }
+            printf("\nPress any key\n");
+            wait_key();
         }
     }
 }
