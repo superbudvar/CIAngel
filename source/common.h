@@ -12,4 +12,5 @@ enum install_modes {
 
 extern install_modes selected_mode;
 extern std::string regionFilter;
+extern bool bSvcHaxAvailable;
 extern bool bExit;

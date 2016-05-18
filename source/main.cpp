@@ -39,7 +39,6 @@
 
 
 // Vector used for download queue
-static bool bSvcHaxAvailable = true;
 static bool updateScreen = true;
 int sourceDataType;
 Json::Value sourceData;
@@ -191,7 +190,6 @@ bool menu_search_keypress(int selected, u32 key, void* data)
     // X triggers adding items to the download queue
     if (key & KEY_X)
     {
-        consoleClear();
         std::string titleid = (*cb_data)[selected].titleid;
         if (std::find_if(game_queue.begin(), game_queue.end(), find_game_item(titleid)) == game_queue.end())
         {
@@ -205,9 +203,6 @@ bool menu_search_keypress(int selected, u32 key, void* data)
         }
 
         printf("Queue size: %d\n", game_queue.size());
-        wait_key_specific("\nPress A to continue.\n", KEY_A);
-
-        return true;
     }
 
     return false;
@@ -225,8 +220,6 @@ void action_search()
     }
     HB_Keyboard sHBKB;
     bool bKBCancelled = false;
-
-    consoleClear();
 
     std::string searchString = getInput("Please enter text to search for:",&sHBKB, bKBCancelled);
     if (bKBCancelled)
@@ -327,50 +320,61 @@ void action_search()
     titles_multkey_draw(header, footer, 1, &display_output, &display_output, menu_search_keypress);
 }
 
+bool menu_queue_keypress(int selected, u32 key, void* data)
+{
+    // If key is 0, it means aptMainLoop() returned false, so we're exiting
+    // Go back to the previous menu which will handle quitting
+    if (!key) {
+        return true;
+    }
+
+    // B goes back a screen
+    if (key & KEY_B)
+    {
+        return true;
+    }
+
+    if (key & KEY_X)
+    {
+        game_queue.clear();
+        return true;
+    }
+
+    if (key & KEY_A)
+    {
+        ProcessGameQueue();
+        return true;
+    }
+    return false;
+}
+
+void action_enable_svchax() 
+{
+    svchax_init(true);
+    if(__ctr_svchax && __ctr_svchax_srv) {
+        bSvcHaxAvailable = true;
+    }
+}
 void action_prompt_queue()
 {
     consoleClear();
 
     std::string mode_text;
     if(selected_mode == make_cia) {
-        mode_text = "download";
+        mode_text = "Download";
     }
     else if (selected_mode == install_direct) {
-        mode_text = "install";
+        mode_text = "Install";
     }
     else if (selected_mode == install_ticket) {
-        mode_text = "create tickets for";
+        mode_text = "Install";
     }
 
-    printf("Queue contains %d items.\n", game_queue.size());
-    for(int i=0; i< game_queue.size(); ++i) {
-        printf("%i; %s\n", i+1, game_queue[i].norm_name.c_str() );
-    }
-
-    printf("Press A to %s queue.\n", mode_text.c_str());
-    printf("Press B to return to menu.\n");
-    printf("Press X to clear queue.\n");
-
-    while (aptMainLoop())
-    {
-        u32 key = wait_key();
-        if (key & KEY_B)
-        {
-            break;
-        }
-
-        if (key & KEY_X)
-        {
-            game_queue.clear();
-            break;
-        }
-
-        if (key & KEY_A)
-        {
-            ProcessGameQueue();
-            break;
-        }
-    }
+    char footer[51];
+    char header[51];
+    sprintf(header, "Queue contains %d items.\n", game_queue.size());
+    sprintf(footer, "A: %s queue  X: clear B: return", mode_text.c_str());
+    titles_multkey_draw(header, footer, 0, &game_queue, NULL, menu_queue_keypress);
 
 }
 
@@ -547,12 +551,21 @@ bool menu_main_keypress(int selected, u32 key, void*)
                 action_input_txt();
             break;
             case 4:
-                action_download();
+                action_enable_svchax();
             break;
             case 5:
-                action_about();
+                action_toggle_install();
             break;
             case 6:
+                action_toggle_region();
+            break;
+            case 7:
+                action_download();
+            break;
+            case 8:
+                action_about();
+            break;
+            case 9:
                 action_exit();
             break;
         }
@@ -582,6 +595,9 @@ void menu_main()
         "Process download queue",
         "Enter a title key/ID pair",
         "Fetch title key/ID from input.txt",
+        "Enable svchax",
+        "Toggle Mode",
+        "Toggle Region",
         "Download wings.json",
         "About CIAngel",
         "Exit",
@@ -596,13 +612,6 @@ void menu_main()
         sprintf(footer, "(L):Install Mode (R):Region |  Queue: %d", game_queue.size());
 
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
-//        if(updateScreen) {
-            updateScreen = false;
-            clear_screen(GFX_BOTTOM);
-//        }
-
-        menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
-
     }
 }
 
@@ -619,9 +628,8 @@ int main(int argc, const char* argv[])
     // Sadly svchax crashes too much, so only allow install mode when running as a CIA
     // Trigger svchax so we can install CIAs
     if(argc > 0) {
-        svchax_init(true);
-        if(!__ctr_svchax || !__ctr_svchax_srv) {
-            bSvcHaxAvailable = false;
+        action_enable_svchax();
+        if(!bSvcHaxAvailable) {
             printf("Failed to acquire kernel access. Install mode disabled.\n");
         }
     }

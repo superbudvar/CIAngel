@@ -34,5 +34,4 @@ void titles_multkey_draw(const char *title, const char *footer, int back, std::v
                          bool (*callback)(int result, u32 key, void *data));
 void menu_multkey_draw(const char *title, const char *footer, int back, int count, const char *options[], void *data,
                        bool (*callback)(int result, u32 key, void *data));
-
 #endif // __MENU_H_INCLUDED__
