@@ -2,20 +2,21 @@
 
 std::vector<game_item> game_queue;
 
-Result ConvertToCIA(std::string dir, std::string titleName)
+Result ProcessCIA(std::string dir, std::string titleName)
 {
-    char cwd[1024];
-    if (getcwdir(cwd, sizeof(cwd)) == NULL){
-        printf("[!] Could not store Current Working Directory\n");
+    FILE *tik = fopen((dir + "/ticket").c_str(), "rb");
+    if (!tik) 
+    {
         return -1;
     }
-    chdir(dir.c_str());
-    FILE *tik = fopen("cetk", "rb");
-    if (!tik) return -1;
     TIK_CONTEXT tik_context = process_tik(tik);
 
     FILE *tmd = fopen((dir + "/tmd").c_str(),"rb");
-    if (!tmd) return -1;
+    if (!tmd) 
+    {
+        fclose(tik);
+        return -1;
+    }
     TMD_CONTEXT tmd_context = process_tmd(tmd);
 
     if(tik_context.result != 0 || tmd_context.result != 0){
@@ -26,26 +27,39 @@ Result ConvertToCIA(std::string dir, std::string titleName)
         return -1;
     }
 
-    chdir(cwd);
-
     int result;
-    if (selected_mode == install_direct)
+    if (config.GetMode() == CConfig::Mode::INSTALL_CIA)
     {
         result = install_cia(tmd_context, tik_context);
     }
     else
     {
         FILE *output = fopen((dir + "/" + titleName + ".cia").c_str(),"wb");
-        if (!output) return -2;
-
-        result = generate_cia(tmd_context, tik_context, output);
-        if(result != 0){
-            remove((dir + "/" + titleName + ".cia").c_str());
+        if (!output) 
+        {
+            result = -2;
+        }
+        else
+        {
+            result = generate_cia(tmd_context, tik_context, output);
+            if(result != 0)
+            {
+                remove((dir + "/" + titleName + ".cia").c_str());
+            }
         }
     }
 
+    // free allocated memory/handles
+    free(tmd_context.content_struct);
+    fclose(tik);
+    fclose(tmd);
+
+    // Clean up temp files
+    remove((dir + "/ticket").c_str());
+    remove((dir + "/tmd").c_str());
     return result;
 }
+
 void DownloadQueueItem(std::string titleId, std::string encTitleKey, std::string titleName) {
 }
 
@@ -78,24 +92,24 @@ Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string t
     }
 
     std::string mode_text;
-    if(selected_mode == make_cia){
+    if(config.GetMode() == CConfig::Mode::DOWNLOAD_CIA)
+    {
         mode_text = "create";
     }
-    else if(selected_mode == install_direct){
+    else if(config.GetMode() == CConfig::Mode::INSTALL_CIA)
+    {
         mode_text = "install";
     }
 
 
     printf("Starting - %s\n", titleName.c_str());
 
-    mkpath((outputDir + "/tmp/").c_str(), 0777);
-
     // Make sure the CIA doesn't already exist
     std::string cp = outputDir + "/" + titleName + ".cia";
     char *ciaPath = new char[cp.size()+1];
     ciaPath[cp.size()]=0;
     memcpy(ciaPath,cp.c_str(),cp.size());
-    if ( (selected_mode == make_cia) && FileExists(ciaPath))
+    if (config.GetMode() == CConfig::Mode::DOWNLOAD_CIA && FileExists(ciaPath))
     {
         free(ciaPath);
         printf("%s/%s.cia already exists.\n", outputDir.c_str(), titleName.c_str());
@@ -127,25 +141,23 @@ Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string t
     tmdfs.read(titleVersion, 0x2);
     tmdfs.close();
 
-    CreateTicket(titleId, encTitleKey, titleVersion, outputDir + "/tmp/cetk");
+    CreateTicket(titleId, encTitleKey, titleVersion, outputDir + "/tmp/ticket");
 
     printf("Now %s the CIA...\n", mode_text.c_str());
 
-    res = ConvertToCIA(outputDir + "/tmp", titleName);
+    res = ProcessCIA(outputDir + "/tmp", titleName);
     if (res != 0)
     {
         printf("Could not %s the CIA.\n", mode_text.c_str());
         return res;
     }
 
-    if (selected_mode == make_cia)
+    if (config.GetMode() == CConfig::Mode::DOWNLOAD_CIA)
     {
         rename((outputDir + "/tmp/" + titleName + ".cia").c_str(), (outputDir + "/" + titleName + ".cia").c_str());
     }
 
     printf(" DONE!\n");
-
-    // TODO remove tmp dir
 
     return res;
 }
@@ -154,10 +166,6 @@ void ProcessGameQueue()
 {
     // Create the tickets folder if we're in ticket mode
     char empty_titleVersion[2] = {0x00, 0x00};
-    if (selected_mode == install_ticket)
-    {
-        mkpath("/CIAngel/tickets/", 0777); 
-    }
 
     std::vector<game_item>::iterator game = game_queue.begin();
     while(aptMainLoop() && game != game_queue.end())
@@ -166,14 +174,18 @@ void ProcessGameQueue()
         std::string selected_enckey = (*game).titlekey;
         std::string selected_name = (*game).norm_name;
 
-        if (selected_mode == install_ticket)
+        if (config.GetMode() == CConfig::Mode::INSTALL_TICKET)
         {
-            CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tickets/" + selected_name + ".tik");
-            InstallTicket("/CIAngel/tickets/" + selected_name + ".tik");
+            CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tmp/ticket");
+            InstallTicket("/CIAngel/tmp/ticket");
         }
         else
         {
-            DownloadTitle(selected_titleid, selected_enckey, selected_name);
+            Result res = DownloadTitle(selected_titleid, selected_enckey, selected_name);
+            if (R_FAILED(res)) {
+                printf("Error processing queue. Returning to menu\n");
+                break;
+            }
         }
 
         game = game_queue.erase(game);

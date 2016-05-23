@@ -28,6 +28,10 @@
 
 #include "utils2.h"
 #include "DownloadQueue.h"
+#include "config.h"
+#include "menu.h"
+#include "utils.h"
+#include "data.h"
 
 #include "svchax/svchax.h"
 #include "common.h"
@@ -39,11 +43,9 @@
 
 
 // Vector used for download queue
-static bool updateScreen = true;
 int sourceDataType;
 Json::Value sourceData;
 
-u32 kDown;
 
 struct find_game_item {
     std::string titleid;
@@ -57,8 +59,6 @@ bool compareByScore(const game_item &a, const game_item &b)
 {
     return a.score > b.score;
 }
-
-
 
 std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
 {
@@ -101,13 +101,19 @@ std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
             if(strcmp(last_input.c_str(),input.c_str()) != 0) {
                 screen_begin_frame();
                 ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
-                ui_menu_draw_string(input.c_str(), 10, 30, 0.5f, COLOR_WHITE);
+                // If input string is > 50 characters, show just the right hand side
+                uint charlimit = 49;
+                if (input.length() > charlimit)
+                {
+                    ui_menu_draw_string(input.substr(input.length() - charlimit).c_str(), 10, 30, 0.5f, COLOR_WHITE);
+                }
+                else
+                {
+                    ui_menu_draw_string(input.c_str(), 10, 30, 0.5f, COLOR_WHITE);
+                }
                 screen_end_frame();
                 last_input = input;
             }
-            //Wait for VBlank
-            //gfxFlushBuffers();
-            //gfxSwapBuffers();
         }
         gfxFlushBuffers();
         gspWaitForVBlank();
@@ -139,6 +145,17 @@ void load_JSON_data()
           sourceDataType = JSON_TYPE_WINGS;
         }
     }
+}
+
+void loadConfig()
+{
+    // Load config, and force mode to DOWNLOAD_CIA if svcHax not available, then resave
+    config.LoadConfig("/CIAngel/config.json");
+    if (!bSvcHaxAvailable)
+    {
+        config.SetMode(CConfig::Mode::DOWNLOAD_CIA);
+    }
+    config.SaveConfig();
 }
 
 // Search menu keypress callback
@@ -173,13 +190,14 @@ bool menu_search_keypress(int selected, u32 key, void* data)
         //removes any problem chars, not sure if whitespace is a problem too...?
         removeForbiddenChar(&selected_name, false);
 
-        if(selected_mode == install_ticket){
+        if(config.GetMode() == CConfig::Mode::INSTALL_TICKET)
+        {
             char empty_titleVersion[2] = {0x00, 0x00};
-            mkpath("/CIAngel/tickets/", 0777); 
-            CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tickets/" + selected_name + ".tik");
-            InstallTicket("/CIAngel/tickets/" + selected_name + ".tik");
+            CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tmp/ticket");
+            InstallTicket("/CIAngel/tmp/ticket");
         }
-        else{
+        else
+        {
             DownloadTitle(selected_titleid, selected_enckey, selected_name);
         }
 
@@ -208,8 +226,28 @@ bool menu_search_keypress(int selected, u32 key, void* data)
     return false;
 }
 
+/* Search filter functions */
+// Fuzzy match based on the game name
+bool search_by_name(std::string &searchString, Json::Value &gameData, int &outScore)
+{
+    return fts::fuzzy_match(searchString.c_str(), gameData["ascii_name"].asCString(), outScore);
+}
+
+// Wildcard match based on game serial
+bool search_by_serial(std::string &searchString, Json::Value &gameData, int &outScore)
+{
+    if (sourceDataType == JSON_TYPE_WINGS) 
+    {
+        return (upperCase(gameData["code"].asString()).find(upperCase(searchString)) != std::string::npos);
+    }
+    else
+    {
+        return (upperCase(gameData["serial"].asString()).find(upperCase(searchString)) != std::string::npos);
+    }
+}
+
 /* Menu Action Functions */
-void action_search()
+void action_search(bool (*match)(std::string &searchString, Json::Value &gameData, int &outScore))
 {
     consoleClear();
     
@@ -231,41 +269,57 @@ void action_search()
     clear_screen(GFX_BOTTOM);
 
     std::vector<game_item> display_output;
-
-    // UTF8 normalization stuff
-    utf8proc_option_t options = (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE | UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT | UTF8PROC_STRIPMARK | UTF8PROC_STRIPCC);
-    utf8proc_uint8_t* szName;
-    utf8proc_uint8_t *str;
     int outScore;
     
     for (unsigned int i = 0; i < sourceData.size(); i++) {
-        if( regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" && sourceData[i]["region"].asString() != regionFilter) ) {
+        // Check the region filter
+        std::string regionFilter = config.GetRegionFilter();
+        if(regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" && sourceData[i]["region"].asString() != regionFilter) ) {
             continue;
         }
 
-        // Normalize the name down to ASCII. This may break Japanese characters...
-        str = (utf8proc_uint8_t*)sourceData[i]["name"].asCString();
-        utf8proc_map(str, 0, &szName, options);
-        // Fuzzy match based on the search term
-        if (fts::fuzzy_match(searchString.c_str(), (const char*)szName, outScore))
+        // Check that the encTitleKey isn't null
+        if (sourceData[i]["encTitleKey"].isNull())
         {
+            continue;
+        }
+
+        // Create an ASCII version of the name if one doesn't exist yet
+        if (sourceData[i]["ascii_name"].isNull())
+        {
+            // Normalize the name down to ASCII
+            utf8proc_option_t options = (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE | UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT | UTF8PROC_STRIPMARK | UTF8PROC_STRIPCC);
+            utf8proc_uint8_t* szName;
+            utf8proc_uint8_t *str = (utf8proc_uint8_t*)sourceData[i]["name"].asCString();
+            utf8proc_map(str, 0, &szName, options);
+
+            sourceData[i]["ascii_name"] = (const char*)szName;
+
+            free(szName);
+        }
+
+        if (match(searchString, sourceData[i], outScore))
+        {
+
             game_item item;
             item.score = outScore;
             item.index = i;
             item.name = sourceData[i]["name"].asString();
             removeForbiddenChar(&item.name, true);
-            item.norm_name = (const char*)szName;
             item.region = sourceData[i]["region"].asString();
             item.installed = false;
             switch(sourceDataType) {
             case JSON_TYPE_WINGS:
               item.titleid = sourceData[i]["titleid"].asString();
               item.titlekey = sourceData[i]["enckey"].asString();
+              item.name = sourceData[i]["ascii_name"].asString();
+              item.norm_name = sourceData[i]["ascii_name"].asString();
               item.code = sourceData[i]["code"].asString();
               break;
             case JSON_TYPE_ONLINE:
               item.titleid = sourceData[i]["titleID"].asString();
               item.titlekey = sourceData[i]["encTitleKey"].asString();
+              item.name = sourceData[i]["ascii_name"].asString();
               item.code = sourceData[i]["serial"].asString();
               break;
             }
@@ -282,10 +336,7 @@ void action_search()
             if(typeCheck == "0000" || typeCheck == "008c" || typeCheck == "000e" || typeCheck == "8004"){
                 display_output.push_back(item);
             }
-        
         }
-
-        free(szName);
     }
 
     unsigned int display_amount = display_output.size();
@@ -305,12 +356,17 @@ void action_search()
     }
     
     std::string mode_text;
-    if(selected_mode == make_cia) {
-        mode_text = "Create CIA";
-    } else if (selected_mode == install_direct) {
-        mode_text = "Install CIA";
-    } else if (selected_mode == install_ticket) {
-        mode_text = "Create Ticket";
+    switch (config.GetMode())
+    {
+        case CConfig::Mode::DOWNLOAD_CIA:
+            mode_text = "Create CIA";
+        break;
+        case CConfig::Mode::INSTALL_CIA:
+            mode_text = "Install CIA";
+        break;
+        case CConfig::Mode::INSTALL_TICKET:
+            mode_text = "Create Ticket";
+        break;
     }
 
     char footer[51];
@@ -360,14 +416,17 @@ void action_prompt_queue()
     consoleClear();
 
     std::string mode_text;
-    if(selected_mode == make_cia) {
-        mode_text = "Download";
-    }
-    else if (selected_mode == install_direct) {
-        mode_text = "Install";
-    }
-    else if (selected_mode == install_ticket) {
-        mode_text = "Install";
+    switch (config.GetMode())
+    {
+        case CConfig::Mode::DOWNLOAD_CIA:
+            mode_text = "download";
+        break;
+        case CConfig::Mode::INSTALL_CIA:
+            mode_text = "install";
+        break;
+        case CConfig::Mode::INSTALL_TICKET:
+            mode_text = "create tickets for";
+        break;
     }
 
     char footer[51];
@@ -465,20 +524,26 @@ void action_input_txt()
 void action_toggle_install()
 {
     consoleClear();
+    CConfig::Mode nextMode = CConfig::Mode::INSTALL_CIA;
 
-    if(selected_mode == make_cia) {
-        selected_mode = install_direct;
-    } else if (selected_mode == install_direct) {
-        selected_mode = install_ticket;
-    } else if (selected_mode == install_ticket) {
-        selected_mode = make_cia;
+    switch (config.GetMode())
+    {
+        case CConfig::Mode::DOWNLOAD_CIA:
+            nextMode = CConfig::Mode::INSTALL_CIA;
+        break;
+        case CConfig::Mode::INSTALL_CIA:
+            nextMode = CConfig::Mode::INSTALL_TICKET;
+        break;
+        case CConfig::Mode::INSTALL_TICKET:
+            nextMode = CConfig::Mode::DOWNLOAD_CIA;
+        break;
     }
     
-    if ( (selected_mode == install_ticket) || (selected_mode == install_direct) )
+    if (nextMode == CConfig::Mode::INSTALL_TICKET || nextMode == CConfig::Mode::INSTALL_CIA)
     {
         if (!bSvcHaxAvailable)
         {
-            selected_mode = make_cia;
+            nextMode = CConfig::Mode::DOWNLOAD_CIA;
             screen_begin_frame();
             setTextColor(COLOR_RED);
             renderText(0, 0, 1.0f, 1.0f, false, "Kernel access not available.\nCan't enable Install modes.\nYou can only make a CIA.\n");
@@ -486,10 +551,14 @@ void action_toggle_install()
             wait_key_specific("\nPress A to continue.", KEY_A);
         }
     }
+
+    config.SetMode(nextMode);
 }
 
 void action_toggle_region()
 {
+    consoleClear();
+    std::string regionFilter = config.GetRegionFilter();
     if(regionFilter == "off") {
         regionFilter = "ALL";
     } else if (regionFilter == "ALL") {
@@ -501,25 +570,38 @@ void action_toggle_region()
     } else if (regionFilter == "JPN") {
         regionFilter = "off";
     }
+    config.SetRegionFilter(regionFilter);
 }
 
 void action_about()
 {
+    consoleClear();
     screen_begin_frame();
     setTextColor(COLOR_RED);
-    renderText(0, 2, 1.0f, 1.0f, false, "CIAngel by cearp and Drakia\n");
+    renderText(0, 2, 1.0f, 1.0f, false, "CIAngel\n");
     setTextColor(0xFFCCCCCC);
     renderText(0, 32, 0.6f, 0.6f, false, "Download, create and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
+    renderText(0, 102, 0.6f, 0.6f, false, "Contributors: Cearp, Drakia, superbudvar,");
+    renderText(120, 120, 0.6f, 0.6f, false, "mysamdog, cerea1killer");
+    char revision_line;
+    sprintf(&revision_line, "Commit: %s", REVISION_STRING);
+    renderText(0, 220 , 0.6f, 0.6f, false, &revision_line);
+    renderText(0, 200, 0.6f, 0.6f, false, "Press any button to continue.");
     screen_end_frame();
     
-    consoleClear();
-    printf(CONSOLE_RED "CIAngel by cearp and Drakia\n");
-    printf( CONSOLE_RESET);
+    printf(CONSOLE_RED "CIAngel\n\n" CONSOLE_RESET);
     printf("Download, create and install CIAs\n");
     printf("directly from Nintendo's CDN servers.\n");
     printf("Grabbing the latest games has never been");
-    printf("so easy.\n");
-    wait_key_specific("\nPress A to continue.\n", KEY_A);
+    printf("so easy.\n\n");
+
+    printf("Contributors: Cearp, Drakia, superbudvar");
+    printf("              mysamdog, cerea1killer\n");
+
+    printf("\n\nCommit: " REVISION_STRING "\n\n");
+
+    printf("\nPress any button to continue.");
+    wait_key();
 }
 
 void action_exit()
@@ -527,7 +609,7 @@ void action_exit()
     bExit = true;
 }
 
-void action_download()
+void action_download_json()
 {
     consoleClear();
 
@@ -549,33 +631,36 @@ bool menu_main_keypress(int selected, u32 key, void*)
         switch (selected)
         {
             case 0:
-                action_search();
+                action_search(search_by_name);
             break;
             case 1:
-                action_prompt_queue();
+                action_search(search_by_serial);
             break;
             case 2:
-                action_manual_entry();
+                action_prompt_queue();
             break;
             case 3:
-                action_input_txt();
+                action_manual_entry();
             break;
             case 4:
-                action_enable_svchax();
+                action_input_txt();
             break;
             case 5:
-                action_toggle_install();
+                action_enable_svchax();
             break;
             case 6:
-                action_toggle_region();
+                action_toggle_install();
             break;
             case 7:
-                action_download();
+                action_toggle_region();
             break;
             case 8:
-                action_about();
+                action_download_json();
             break;
             case 9:
+                action_about();
+            break;
+            case 10:
                 action_exit();
             break;
         }
@@ -602,6 +687,7 @@ void menu_main()
 {
     const char *options[] = {
         "Search for a title by name",
+        "Search for a title by serial",
         "Process download queue",
         "Enter a title key/ID pair",
         "Fetch title key/ID from input.txt",
@@ -616,10 +702,22 @@ void menu_main()
 
     while (!bExit && aptMainLoop())
     {
-        //Wait for VBlank
-        
+        std::string mode_text;
+        switch (config.GetMode())
+        {
+            case CConfig::Mode::DOWNLOAD_CIA:
+                mode_text = "Create CIA";
+            break;
+            case CConfig::Mode::INSTALL_CIA:
+                mode_text = "Install CIA";
+            break;
+            case CConfig::Mode::INSTALL_TICKET:
+                mode_text = "Create Ticket";
+            break;
+        }
+
         // We have to update the footer every draw, incase the user switches install mode or region
-        sprintf(footer, "(L):Install Mode (R):Region |  Queue: %d", game_queue.size());
+        sprintf(footer, "Mode (L):%s    Region (R):%s", mode_text.c_str(), config.GetRegionFilter().c_str());
 
         menu_multkey_draw("CIAngel by cearp and Drakia", footer, 0, sizeof(options) / sizeof(char*), options, NULL, menu_main_keypress);
     }
@@ -666,8 +764,10 @@ int main(int argc, const char* argv[])
         AM_InitializeExternalTitleDatabase(false);
     }
 
-    // Make sure /CIAngel exists on the SD card
+    // Make sure all CIAngel directories exists on the SD card
     mkpath("/CIAngel", 0777);
+    mkpath("/CIAngel/tmp/", 0777);
+    loadConfig();
     
     // Set up the reading of json
     check_JSON();

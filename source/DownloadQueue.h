@@ -6,6 +6,7 @@
 #include <malloc.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "utils2.h"
 #include "utils.h"
 #include "ticket.h"

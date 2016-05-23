@@ -7,7 +7,7 @@ void CreateTicket(std::string titleId, std::string encTitleKey, char* titleVersi
     std::ofstream ofs;
 
     ofs.open(outputFullPath, std::ofstream::out | std::ofstream::binary | std::ofstream::trunc);
-    ofs.write(tikTemp, 0xA50);
+    ofs.write(tikTemp, TICKET_SIZE);
     ofs.close();
 
     ofs.open(outputFullPath, std::ofstream::out | std::ofstream::in | std::ofstream::binary);

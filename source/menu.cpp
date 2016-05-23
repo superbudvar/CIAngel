@@ -48,13 +48,40 @@ void menu_draw_string_full(const char *str, int pos_y, const char *color)
     gfxFlushBuffers();
 }
 
-void titles_multkey_draw(const char *title, const char *footer, int back, std::vector<game_item> *options, void *data,
-                         bool (*callback)(int result, u32 key, void *data))
+void menu_draw_info(PrintConsole &console, const game_item &game)
+{
+    PrintConsole* currentConsole = consoleSelect(&console);
+    consoleClear();
+
+    printf("Name:    %s\n", game.name.c_str());
+    printf("Serial:  %s\n", game.code.c_str());
+    printf("Region:  %s\n", game.region.c_str());
+    printf("TitleID: %s\n", game.titleid.c_str());
+    printf("Type:    %s\n", GetSerialType(game.code).c_str());
+    if(bSvcHaxAvailable) {
+        printf("Title/Ticket Installed: ");
+        if (game.installed) {
+            printf("yes\n");
+        } else {
+            printf("no\n");
+        }
+    }
+    consoleSelect(currentConsole);
+}
+
+void titles_multkey_draw(const char *title, const char* footer, int back, std::vector<game_item> *options, void* data,
+                      bool (*callback)(int result, u32 key, void* data))
 
 {
-    // Select our menu console and clear the screen
-    PrintConsole *currentConsole = consoleSelect(&currentMenu.menuConsole);
+    // Set up a console on the bottom screen for info
+    GSPGPU_FramebufferFormats infoOldFormat = gfxGetScreenFormat(GFX_BOTTOM);
+    PrintConsole infoConsole;
+    PrintConsole* currentConsole = consoleSelect(&infoConsole);
+    consoleInit(GFX_BOTTOM, &infoConsole);
 
+    // Select our menu console and clear the screen
+    consoleSelect(&currentMenu.menuConsole);
+    
     int count = options->size();
     int current = 0;
     bool firstLoop = true;
@@ -109,16 +136,6 @@ void titles_multkey_draw(const char *title, const char *footer, int back, std::v
                     current_pos_y++;
                 }
                 consoleClear();
-                printf("Title: %s\nRegion: %s\ncode: %s\n", (*options)[current].norm_name.c_str(),
-                       (*options)[current].region.c_str(), (*options)[current].code.c_str());
-                if(bSvcHaxAvailable) {
-                    printf("Title/Ticket Installed: ");
-                    if ((*options)[current].installed) {
-                        printf("yes\n");
-                    } else {
-                        printf("no\n");
-                    }
-                }
             }
             if (footer != NULL) {
                 // Draw the footer if one is provided
@@ -127,6 +144,7 @@ void titles_multkey_draw(const char *title, const char *footer, int back, std::v
             }
             previous_index = current;
             screen_end_frame();
+            menu_draw_info(infoConsole, (*options)[current]);
         }
         u32 key = wait_key();
 
@@ -157,6 +175,9 @@ void titles_multkey_draw(const char *title, const char *footer, int back, std::v
 
     // Reselect the original console
     consoleSelect(currentConsole);
+
+    // Reset the gfx format on the bottom screen
+    gfxSetScreenFormat(GFX_BOTTOM, infoOldFormat);
 }
 
 void menu_multkey_draw(const char *title, const char *footer, int back, int count, const char *options[], void *data,
@@ -170,7 +191,6 @@ void menu_multkey_draw(const char *title, const char *footer, int back, int coun
     bool firstLoop = true;
     int previous_index = 0;
     int menu_offset = 0;
-    int menu_pos_y;
     int menu_end_y = 18;
     int current_pos_y = 0;
     float menuFontSize = 0.5f;
@@ -179,12 +199,17 @@ void menu_multkey_draw(const char *title, const char *footer, int back, int coun
 
     while (!bExit && aptMainLoop()) {
         std::string mode_text;
-        if (selected_mode == make_cia) {
-            mode_text = "Create CIA";
-        } else if (selected_mode == install_direct) {
-            mode_text = "Install CIA";
-        } else if (selected_mode == install_ticket) {
-            mode_text = "Create Ticket";
+        switch (config.GetMode())
+        {
+            case CConfig::Mode::DOWNLOAD_CIA:
+                mode_text = "Create CIA";
+            break;
+            case CConfig::Mode::INSTALL_CIA:
+                mode_text = "Install CIA";
+            break;
+            case CConfig::Mode::INSTALL_TICKET:
+                mode_text = "Create Ticket";
+            break;
         }
 
         if (firstLoop || previous_index != current) {
@@ -196,7 +221,6 @@ void menu_multkey_draw(const char *title, const char *footer, int back, int coun
             consoleClear();
             // Draw the header
             ui_menu_draw_string(title, 0, 0, 0.7f, COLOR_TITLE);
-            menu_pos_y = current_pos_y;
             for (int i = 0; (menu_offset + i) < count && i < results_per_page; i++) {
                 int y_pos = 32 + (i * menuLineHeight);
                 u64 color = COLOR_MENU_ITEM;
@@ -207,11 +231,11 @@ void menu_multkey_draw(const char *title, const char *footer, int back, int coun
             }
             setTextColor(COLOR_FOOTER);
             renderText(0, 220, 0.7f, 0.7f, false, "Mode:");
-            renderText(175, 220, 0.7f, 0.7f, false, "Region:");
+            renderText(180, 220, 0.7f, 0.7f, false, "Region:");
             renderText(300, 220, 0.7f, 0.7f, false, "Queue:");
             setTextColor(COLOR_FOOTER_SELECTED);
             renderText(60, 220, 0.7f, 0.7f, false, mode_text.c_str());
-            renderText(245, 220, 0.7f, 0.7f, false, regionFilter.c_str());
+            renderText(250, 220, 0.7f, 0.7f, false, config.GetRegionFilter().c_str());
             char qSize[5];
             sprintf(qSize, "%d", game_queue.size());
             renderText(363, 220, 0.7f, 0.7f, false, qSize);

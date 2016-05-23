@@ -134,6 +134,8 @@ void renderText(float x, float y, float scaleX, float scaleY, bool baseline, con
 
             x += data.xAdvance;
         }
+//        uiConsole.cursorX = x;
+//        uiConsole.cursorY = y;
     } while (code > 0);
 }
 
@@ -418,7 +420,8 @@ void sceneInit(void)
         printf("Failed to initialize the GPU.");
         return;
     }
-
+//    uiConsole.cursorX = 0;
+//    uiConsole.cursorY = 0;
     c3dInitialized = true;
 
     // Initialize the render target
@@ -495,3 +498,8 @@ void sceneInit(void)
     textVtxArray = (textVertex_s *)linearAlloc(sizeof(textVertex_s) * TEXT_VTX_ARRAY_COUNT);
     loadTextures();
 }
+
+//void ui_printf(std::string output) {
+//    uiConsole.buffer.append(output);
+//    renderText(0f, 0f, 0.5f, 0.5f, false, uiConsole.buffer);
+//}
