@@ -742,14 +742,14 @@ bool check_JSON() {
       double age_days = age_seconds / (60 * 60 * 24);
 
       if (age_seconds > JSON_UPDATE_INTERVAL_IN_SECONDS) {
+        screen_begin_frame();
         char buf[255];
         sprintf(buf, "Your wings.json is %d days old\n\nPress A to update, or any other key to skip.\n", (int)age_days);
         setTextColor(COLOR_GREEN);
-        renderText(0, 0, 0.5f, 0.5f, true, buf);
-        printf(buf);
+        renderText(0, 0, 0.5f, 0.5f, false, buf);
         //Wait for VBlank
         gspWaitForVBlank();
-        sceneDraw();
+        screen_end_frame();
 
         u32 keys = wait_key();
 
@@ -759,9 +759,10 @@ bool check_JSON() {
         return true;
       }
     } else {
+        screen_begin_frame();
         setTextColor(COLOR_GREEN);
         renderText(350,0, 0.4f, 0.4f, false, "No wings.json");
-        sceneDraw();
+        screen_end_frame();
         printf("\nPress A to Download, or any other key to return.\n");
         u32 keys = wait_key();
       

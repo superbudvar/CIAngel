@@ -388,7 +388,6 @@ void action_manual_entry()
     // Keep looping so the user can retry if they enter a bad id/key
     while(true)
     {
-        printf("Please enter a titleID:\n");
         std::string titleId = getInput("Please enter a titleID:", &sHBKB, bKBCancelled);
         std::string key;
         if (bKBCancelled)
@@ -405,13 +404,14 @@ void action_manual_entry()
             }
 
             if(tempId.compare(titleId) == 0 && tempKey.length() == 32) {
-               printf("Found encTitleKey, proceeding automatically\n"); 
+                screen_begin_frame();
+                renderText(0, 18, 1.0f, 1.0f, false, "Found encTitleKey, proceeding automatically\n");
+                screen_end_frame();
                key = tempKey;
                break;
             }
         }
         if(key.length() != 32) {
-            printf("Please enter the corresponding encTitleKey:\n");
             key = getInput("Please enter the corresponding encTitleKey:", &sHBKB, bKBCancelled);
             if (bKBCancelled)
             {
@@ -426,14 +426,21 @@ void action_manual_entry()
         }
         else
         {   
-            printf("There was an error in you input:\n");  
+            screen_begin_frame();
+            std::ostringstream m;
+            m << "There was an error in you input:\n"; 
             if(titleId.length() != 16) {
-                printf("titleIDs are 16 chars long, not %i\n", titleId.length());
+                m << "titleIDs are 16 chars long, not " << titleId.length();
+                m << "\n";
             }
             if(key.length() != 32) {
-                printf("encTitleKeys are 32 chars long, not %i\n", key.length());
+                m << "encTitleKeys are 32 chars long, not " << key.length();
+                m << "\n";
             }
-            printf("\nPress any key\n");
+            m << "\nPress any key\n";
+            std::string msg(m.str());
+            renderText(0, 18, 0.7f, 0.7f, false, msg.c_str());
+            screen_end_frame();
             wait_key();
         }
     }
@@ -472,7 +479,10 @@ void action_toggle_install()
         if (!bSvcHaxAvailable)
         {
             selected_mode = make_cia;
-            printf(CONSOLE_RED "Kernel access not available.\nCan't enable Install modes.\nYou can only make a CIA.\n" CONSOLE_RESET);
+            screen_begin_frame();
+            setTextColor(COLOR_RED);
+            renderText(0, 0, 1.0f, 1.0f, false, "Kernel access not available.\nCan't enable Install modes.\nYou can only make a CIA.\n");
+            screen_end_frame();
             wait_key_specific("\nPress A to continue.", KEY_A);
         }
     }

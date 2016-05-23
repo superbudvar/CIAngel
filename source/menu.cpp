@@ -80,42 +80,44 @@ void titles_multkey_draw(const char *title, const char *footer, int back, std::v
             // Draw the header
             ui_menu_draw_string(title, 0, 0, 0.7f, COLOR_TITLE);
             menu_pos_y = current_pos_y;
-            for (int i = 0; menu_offset + i < count && i < results_per_page; i++) {
-                int y_pos = 18 + (i * menuLineHeight);
-                u64 color = COLOR_MENU_ITEM;
-                if (i + menu_offset == current) {
-                    color = COLOR_SELECTED;
-                } else if ((*options)[i + menu_offset].installed) {
-                    color = COLOR_MENU_INSTALLED;
-                }
+            if(count > 0) {
+                for (int i = 0; menu_offset + i < count && i < results_per_page; i++) {
+                    int y_pos = 18 + (i * menuLineHeight);
+                    u64 color = COLOR_MENU_ITEM;
+                    if (i + menu_offset == current) {
+                        color = COLOR_SELECTED;
+                    } else if ((*options)[i + menu_offset].installed) {
+                        color = COLOR_MENU_INSTALLED;
+                    }
 
-                u32 flagWidth = 0;
-                u32 flagHeight = 0;
-                int flagType;
-                std::string region = (*options)[menu_offset + i].region;
-                flagType = TEXTURE_FLAG_ALL;
-                if (region == "EUR") {
-                    flagType = TEXTURE_FLAG_EUR;
-                } else if (region == "USA") {
-                    flagType = TEXTURE_FLAG_USA;
-                } else if (region == "JPN") {
-                    flagType = TEXTURE_FLAG_JPN;
+                    u32 flagWidth = 0;
+                    u32 flagHeight = 0;
+                    int flagType;
+                    std::string region = (*options)[menu_offset + i].region;
+                    flagType = TEXTURE_FLAG_ALL;
+                    if (region == "EUR") {
+                        flagType = TEXTURE_FLAG_EUR;
+                    } else if (region == "USA") {
+                        flagType = TEXTURE_FLAG_USA;
+                    } else if (region == "JPN") {
+                        flagType = TEXTURE_FLAG_JPN;
+                    }
+                    screen_get_texture_size(&flagWidth, &flagHeight, flagType);
+                    //                ui_menu_draw_string( region.c_str(), 1, y_pos, menuFontSize, color);
+                    screen_draw_texture(flagType, 0, y_pos, flagWidth, flagHeight);
+                    ui_menu_draw_string((*options)[menu_offset + i].name.c_str(), text_offset_x, y_pos, menuFontSize, color);
+                    current_pos_y++;
                 }
-                screen_get_texture_size(&flagWidth, &flagHeight, flagType);
-                //                ui_menu_draw_string( region.c_str(), 1, y_pos, menuFontSize, color);
-                screen_draw_texture(flagType, 0, y_pos, flagWidth, flagHeight);
-                ui_menu_draw_string((*options)[menu_offset + i].name.c_str(), text_offset_x, y_pos, menuFontSize, color);
-                current_pos_y++;
-            }
-            consoleClear();
-            printf("Title: %s\nRegion: %s\ncode: %s\n", (*options)[current].norm_name.c_str(),
-                   (*options)[current].region.c_str(), (*options)[current].code.c_str());
-            if(bSvcHaxAvailable) {
-                printf("Title/Ticket Installed: ");
-                if ((*options)[current].installed) {
-                    printf("yes\n");
-                } else {
-                    printf("no\n");
+                consoleClear();
+                printf("Title: %s\nRegion: %s\ncode: %s\n", (*options)[current].norm_name.c_str(),
+                       (*options)[current].region.c_str(), (*options)[current].code.c_str());
+                if(bSvcHaxAvailable) {
+                    printf("Title/Ticket Installed: ");
+                    if ((*options)[current].installed) {
+                        printf("yes\n");
+                    } else {
+                        printf("no\n");
+                    }
                 }
             }
             if (footer != NULL) {
