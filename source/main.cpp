@@ -30,10 +30,10 @@
 #include "DownloadQueue.h"
 #include "config.h"
 #include "menu.h"
+#include "menu_settings.h"
 #include "utils.h"
 #include "data.h"
 
-#include "svchax/svchax.h"
 #include "common.h"
 #include "json/json.h"
 #include "fts_fuzzy_match.h"
@@ -405,13 +405,6 @@ bool menu_queue_keypress(int selected, u32 key, void* data)
     return false;
 }
 
-void action_enable_svchax() 
-{
-    svchax_init(true);
-    if(__ctr_svchax && __ctr_svchax_srv) {
-        bSvcHaxAvailable = true;
-    }
-}
 void action_prompt_queue()
 {
     consoleClear();
@@ -522,58 +515,6 @@ void action_input_txt()
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
 
-void action_toggle_install()
-{
-    consoleClear();
-    CConfig::Mode nextMode = CConfig::Mode::INSTALL_CIA;
-
-    switch (config.GetMode())
-    {
-        case CConfig::Mode::DOWNLOAD_CIA:
-            nextMode = CConfig::Mode::INSTALL_CIA;
-        break;
-        case CConfig::Mode::INSTALL_CIA:
-            nextMode = CConfig::Mode::INSTALL_TICKET;
-        break;
-        case CConfig::Mode::INSTALL_TICKET:
-            nextMode = CConfig::Mode::DOWNLOAD_CIA;
-        break;
-    }
-    
-    if (nextMode == CConfig::Mode::INSTALL_TICKET || nextMode == CConfig::Mode::INSTALL_CIA)
-    {
-        if (!bSvcHaxAvailable)
-        {
-            nextMode = CConfig::Mode::DOWNLOAD_CIA;
-            screen_begin_frame();
-            setTextColor(COLOR_RED);
-            renderText(0, 0, 1.0f, 1.0f, false, "Kernel access not available.\nCan't enable Install modes.\nYou can only make a CIA.\n");
-            screen_end_frame();
-            wait_key_specific("\nPress A to continue.", KEY_A);
-        }
-    }
-
-    config.SetMode(nextMode);
-}
-
-void action_toggle_region()
-{
-    consoleClear();
-    std::string regionFilter = config.GetRegionFilter();
-    if(regionFilter == "off") {
-        regionFilter = "ALL";
-    } else if (regionFilter == "ALL") {
-        regionFilter = "EUR";
-    } else if (regionFilter == "EUR") {
-        regionFilter = "USA";
-    } else if (regionFilter == "USA") {
-        regionFilter = "JPN";
-    } else if (regionFilter == "JPN") {
-        regionFilter = "off";
-    }
-    config.SetRegionFilter(regionFilter);
-}
-
 void action_about()
 {
     consoleClear();
@@ -647,21 +588,15 @@ bool menu_main_keypress(int selected, u32 key, void*)
                 action_input_txt();
             break;
             case 5:
-                action_enable_svchax();
-            break;
-            case 6:
-                action_toggle_install();
-            break;
-            case 7:
-                action_toggle_region();
-            break;
-            case 8:
                 action_download_json();
             break;
-            case 9:
+            case 6:
+                menu_settings();
+            break;
+            case 7:
                 action_about();
             break;
-            case 10:
+            case 8:
                 action_exit();
             break;
         }
@@ -692,10 +627,8 @@ void menu_main()
         "Process download queue",
         "Enter a title key/ID pair",
         "Fetch title key/ID from input.txt",
-        "Enable svchax",
-        "Toggle Mode",
-        "Toggle Region",
         "Download wings.json",
+        "Settings",
         "About CIAngel",
         "Exit",
     };
