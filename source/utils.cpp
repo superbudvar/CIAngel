@@ -128,14 +128,16 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
 {
 	// Don't attempt to calculate anything if we don't have a final size
 	if (nSize == 0) return;
-    setTextColor(COLOR_GREEN);
-    renderText(0, 8, 0.7f, 0.7f, false, "downlading");
 	
 	// Switch to the progress console
 	PrintConsole* currentConsole = consoleSelect(console);
 	consoleClear();
 
-	// Set the start time if nLastSize is 0
+    screen_begin_frame();
+    setTextColor(COLOR_RED);
+    renderText(0, 8, 1.0f, 1.0f, false, "Downloading...");
+	
+    // Set the start time if nLastSize is 0
 	static u64 nStartTime;
 	if (nCurrent == 0)
 	{
@@ -149,14 +151,23 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
 	double fPercent = ((double)nCurrent / nSize) * 100.0;
 	u16 barDrawWidth = (fPercent / 100) * 30;
 
+    setTextColor(COLOR_CYAN);
 	int i = 0;
 	for (i = 0; i < barDrawWidth; i++)
 	{
 		printf("|");
 	}
 	printf("\n");
+    u32 pbarWidth = 0;
+    u32 pbarHeight = 0;
+    screen_get_texture_size(&pbarWidth, &pbarHeight, TEXTURE_PROGRESS_BAR);
+    screen_draw_texture(TEXTURE_PROGRESS_BAR, 0, 120-(pbarHeight/2), (fPercent*4), pbarHeight);
 
 	// Output current progress
+    char progress_text;
+	sprintf(&progress_text, "%0.2f / %0.2fMB  % 3.2f%%", ((double)nCurrent) / 1024 / 1024, ((double)nSize) / 1024 / 1024, fPercent);
+    setTextColor(COLOR_WHITE);
+    renderText(TOP_SCREEN_HEIGHT-30, 120, 0.7f, 0.7f, true, &progress_text);
 	printf("   %0.2f / %0.2fMB  % 3.2f%%\n", ((double)nCurrent) / 1024 / 1024, ((double)nSize) / 1024 / 1024, fPercent);
 
 	// Calculate download speed
@@ -168,13 +179,17 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
 		if (seconds > 0)
 		{
 			double speed = ((nCurrent / seconds) / 1024);
+            char speed_text;
+			sprintf(&speed_text, "Avg Speed: %.02f KB/s", speed);
 			printf("   Avg Speed: %.02f KB/s\n", speed);
+            renderText(0, 220, 0.7f, 0.7f, true, &speed_text);
 		}
 	}
 
 	// Make sure the screen updates
     gfxFlushBuffers();
     gspWaitForVBlank();
+    screen_end_frame();
 
     // Switch back to the original console
     consoleSelect(currentConsole);
@@ -337,10 +352,6 @@ Result DownloadFile_Internal(const char *url, void *out, bool bProgress,
     if (ret != 0) goto _out;
 
     {
-        if(fileSize>bufSize) {
-  //          printf("fileSize: %i too big for buffer %i", fileSize, bufSize);
-        }
-//        printf("fileSize: %i buffer %i", fileSize, bufSize);
         unsigned char *buffer = (unsigned char *)linearAlloc(bufSize);
         if (buffer == NULL)
         {

@@ -20,6 +20,7 @@ extern "C" {
 #define TEXTURE_FLAG_USA 3
 #define TEXTURE_FLAG_JPN 4
 #define TEXTURE_FLAG_ALL 5
+#define TEXTURE_PROGRESS_BAR 6
 
 #define COLOR_BLACK 0xFF000000
 #define COLOR_BLUE 0xFFff0000

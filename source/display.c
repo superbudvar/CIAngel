@@ -408,6 +408,7 @@ void loadTextures()
 {
     screen_load_texture_file(TEXTURE_SCREEN_TOP_SPLASH_BG, "sky.png", true);
     screen_load_texture_file(TEXTURE_APP_BANNER, "banner.png", true);
+    screen_load_texture_file(TEXTURE_PROGRESS_BAR, "pbar.png", true);
     screen_load_texture_file(TEXTURE_FLAG_EUR, "eur16.png", false);
     screen_load_texture_file(TEXTURE_FLAG_USA, "usa16.png", true);
     screen_load_texture_file(TEXTURE_FLAG_JPN, "jpn16.png", true);
