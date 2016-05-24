@@ -144,6 +144,32 @@ void load_JSON_data()
         } else if (sourceData[0]["titleid"].isString()) {
           sourceDataType = JSON_TYPE_WINGS;
         }
+        // Optimise the json data
+        for (unsigned int i = 0; i < sourceData.size(); i++) {
+            // Check that the encTitleKey isn't null
+            if (sourceData[i]["encTitleKey"].isNull())
+            {
+                continue;
+            }
+            // Normalize the name down to ASCII
+            utf8proc_option_t options = (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE | UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT | UTF8PROC_STRIPMARK | UTF8PROC_STRIPCC);
+            utf8proc_uint8_t* szName;
+            utf8proc_uint8_t *str = (utf8proc_uint8_t*)sourceData[i]["name"].asCString();
+            utf8proc_map(str, 0, &szName, options);
+
+            sourceData[i]["ascii_name"] = (const char*)szName;
+            switch(sourceDataType) {
+            case JSON_TYPE_WINGS:
+              sourceData[i]["titleID"] = sourceData[i]["titleid"];
+              sourceData[i]["encTitleKey"] = sourceData[i]["enckey"];
+              sourceData[i]["serial"] = sourceData[i]["code"];
+              break;
+            case JSON_TYPE_ONLINE:
+              break;
+            }
+
+            free(szName);
+        }
     }
 }
 
@@ -184,7 +210,7 @@ bool menu_search_keypress(int selected, u32 key, void* data)
         // Fetch the title data and start downloading
         std::string selected_titleid = (*cb_data)[selected].titleid;
         std::string selected_enckey = (*cb_data)[selected].titlekey;
-        std::string selected_name = (*cb_data)[selected].norm_name;
+        std::string selected_name = (*cb_data)[selected].ascii_name;
 
         printf("OK - %s\n", selected_name.c_str());
         //removes any problem chars, not sure if whitespace is a problem too...?
@@ -272,30 +298,16 @@ void action_search(bool (*match)(std::string &searchString, Json::Value &gameDat
     int outScore;
     
     for (unsigned int i = 0; i < sourceData.size(); i++) {
-        // Check the region filter
-        std::string regionFilter = config.GetRegionFilter();
-        if(regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" && sourceData[i]["region"].asString() != regionFilter) ) {
-            continue;
-        }
-
         // Check that the encTitleKey isn't null
         if (sourceData[i]["encTitleKey"].isNull())
         {
             continue;
         }
 
-        // Create an ASCII version of the name if one doesn't exist yet
-        if (sourceData[i]["ascii_name"].isNull())
-        {
-            // Normalize the name down to ASCII
-            utf8proc_option_t options = (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE | UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT | UTF8PROC_STRIPMARK | UTF8PROC_STRIPCC);
-            utf8proc_uint8_t* szName;
-            utf8proc_uint8_t *str = (utf8proc_uint8_t*)sourceData[i]["name"].asCString();
-            utf8proc_map(str, 0, &szName, options);
-
-            sourceData[i]["ascii_name"] = (const char*)szName;
-
-            free(szName);
+        // Check the region filter
+        std::string regionFilter = config.GetRegionFilter();
+        if(regionFilter != "off" && (sourceData[i]["region"].asString() != "ALL" && sourceData[i]["region"].asString() != regionFilter) ) {
+            continue;
         }
 
         if (match(searchString, sourceData[i], outScore))
@@ -305,24 +317,13 @@ void action_search(bool (*match)(std::string &searchString, Json::Value &gameDat
             item.score = outScore;
             item.index = i;
             item.name = sourceData[i]["name"].asString();
+            item.ascii_name = sourceData[i]["ascii_name"].asString();
             removeForbiddenChar(&item.name, true);
             item.region = sourceData[i]["region"].asString();
             item.installed = false;
-            switch(sourceDataType) {
-            case JSON_TYPE_WINGS:
-              item.titleid = sourceData[i]["titleid"].asString();
-              item.titlekey = sourceData[i]["enckey"].asString();
-              item.name = sourceData[i]["ascii_name"].asString();
-              item.norm_name = sourceData[i]["ascii_name"].asString();
-              item.code = sourceData[i]["code"].asString();
-              break;
-            case JSON_TYPE_ONLINE:
-              item.titleid = sourceData[i]["titleID"].asString();
-              item.titlekey = sourceData[i]["encTitleKey"].asString();
-              item.name = sourceData[i]["ascii_name"].asString();
-              item.code = sourceData[i]["serial"].asString();
-              break;
-            }
+            item.titleid = sourceData[i]["titleID"].asString();
+            item.titlekey = sourceData[i]["encTitleKey"].asString();
+            item.code = sourceData[i]["serial"].asString();
             if( bSvcHaxAvailable ) {
                 u64 titleId = hex_to_u64(item.titleid);  
                 FS_MediaType mediaType = ((titleId >> 32) & 0x8010) != 0 ? MEDIATYPE_NAND : MEDIATYPE_SD;

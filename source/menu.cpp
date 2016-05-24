@@ -53,7 +53,7 @@ void menu_draw_info(PrintConsole &console, const game_item &game)
     PrintConsole* currentConsole = consoleSelect(&console);
     consoleClear();
 
-    printf("Name:    %s\n", game.name.c_str());
+    printf("Name:    %s\n", game.ascii_name.c_str());
     printf("Serial:  %s\n", game.code.c_str());
     printf("Region:  %s\n", game.region.c_str());
     printf("TitleID: %s\n", game.titleid.c_str());
@@ -137,6 +137,7 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
                 }
                 consoleClear();
             }
+            menu_draw_info(infoConsole, (*options)[current]);
             if (footer != NULL) {
                 // Draw the footer if one is provided
                 current_pos_y = currentMenu.menuConsole.consoleHeight - 1;
@@ -144,7 +145,6 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
             }
             previous_index = current;
             screen_end_frame();
-            menu_draw_info(infoConsole, (*options)[current]);
         }
         u32 key = wait_key();
 

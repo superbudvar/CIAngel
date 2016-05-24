@@ -21,7 +21,7 @@ typedef struct {
   std::string titlekey;
   std::string name;
   bool installed;
-  std::string norm_name;
+  std::string ascii_name;
   std::string region;
   std::string code;
 } game_item;

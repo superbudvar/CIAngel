@@ -172,7 +172,7 @@ void ProcessGameQueue()
     {
         std::string selected_titleid = (*game).titleid;
         std::string selected_enckey = (*game).titlekey;
-        std::string selected_name = (*game).norm_name;
+        std::string selected_name = (*game).ascii_name;
 
         if (config.GetMode() == CConfig::Mode::INSTALL_TICKET)
         {
