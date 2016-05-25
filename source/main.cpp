@@ -72,7 +72,7 @@ std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
     std::string last_input;
                 
     // draw initial prompt
-    screen_begin_frame();
+    screen_begin_frame(true);
     ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
     screen_end_frame();
     while (KBState != 1 || input.length() == 0)
@@ -99,7 +99,7 @@ std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
         else if (KBState != 4)
         {
             if(strcmp(last_input.c_str(),input.c_str()) != 0) {
-                screen_begin_frame();
+                screen_begin_frame(true);
                 ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
                 // If input string is > 50 characters, show just the right hand side
                 uint charlimit = 49;
@@ -129,7 +129,7 @@ void load_JSON_data()
     struct stat s_tmp;
     sourceDataType = JSON_TYPE_NONE;
     if(stat("/CIAngel/wings.json", &s_tmp) == 0) {
-        screen_begin_frame();
+        screen_begin_frame(false);
         renderBG();
         setTextColor(COLOR_BLACK);
         renderText(0,220, 0.7f, 0.7f, false, "Loading wings.json...");
@@ -457,7 +457,7 @@ void action_manual_entry()
             }
 
             if(tempId.compare(titleId) == 0 && tempKey.length() == 32) {
-                screen_begin_frame();
+                screen_begin_frame(true);
                 renderText(0, 18, 1.0f, 1.0f, false, "Found encTitleKey, proceeding automatically\n");
                 screen_end_frame();
                key = tempKey;
@@ -479,7 +479,7 @@ void action_manual_entry()
         }
         else
         {   
-            screen_begin_frame();
+            screen_begin_frame(true);
             std::ostringstream m;
             m << "There was an error in you input:\n"; 
             if(titleId.length() != 16) {
@@ -518,7 +518,7 @@ void action_input_txt()
 void action_about()
 {
     consoleClear();
-    screen_begin_frame();
+    screen_begin_frame(true);
     setTextColor(COLOR_RED);
     renderText(0, 2, 1.0f, 1.0f, false, "CIAngel\n");
     setTextColor(0xFFCCCCCC);
@@ -663,7 +663,7 @@ int main(int argc, const char* argv[])
     gfxInitDefault();
     consoleInit(GFX_BOTTOM,NULL); 
     sceneInit();
-    screen_begin_frame();
+    screen_begin_frame(true);
     //screen_load_texture_file(TEXTURE_BOTTOM_SCREEN_BG, "bottom_screen_bg.png", true);
     renderBG();
     screen_end_frame();

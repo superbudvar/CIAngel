@@ -72,7 +72,7 @@ static void addTextVertex(float vx, float vy, float tx, float ty)
     vtx->texcoord[1] = ty;
 }
 
-void screen_begin_frame()
+void screen_begin_frame(bool with_bg)
 {
     if (!C3D_FrameBegin(C3D_FRAME_SYNCDRAW)) {
         printf("Failed to begin frame.");
@@ -80,6 +80,9 @@ void screen_begin_frame()
     }
     textVtxArrayPos = 0; // Clear the text vertex array
     C3D_FrameDrawOn(target_top);
+    if(with_bg) {
+       screen_draw_texture(TEXTURE_SCREEN_TOP_BG, 0, 0, TOP_SCREEN_WIDTH, TOP_SCREEN_HEIGHT);
+    }   
 }
 
 void screen_end_frame() { C3D_FrameEnd(0); }
@@ -175,7 +178,7 @@ void sceneDraw()
     }
     // Render the scene
     screen_end_frame();
-    screen_begin_frame();
+    screen_begin_frame(false);
     //    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
     //   textVtxArrayPos = 0; // Clear the text vertex array
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
@@ -407,6 +410,7 @@ void renderBG()
 void loadTextures()
 {
     screen_load_texture_file(TEXTURE_SCREEN_TOP_SPLASH_BG, "sky.png", true);
+    screen_load_texture_file(TEXTURE_SCREEN_TOP_BG, "background.png", true);
     screen_load_texture_file(TEXTURE_APP_BANNER, "banner.png", true);
     screen_load_texture_file(TEXTURE_PROGRESS_BAR, "pbar.png", true);
     screen_load_texture_file(TEXTURE_FLAG_EUR, "eur16.png", false);

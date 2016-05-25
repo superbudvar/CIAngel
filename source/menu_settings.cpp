@@ -20,7 +20,7 @@ void action_toggle_install()
     if (nextMode == CConfig::Mode::INSTALL_TICKET || nextMode == CConfig::Mode::INSTALL_CIA) {
         if (!bSvcHaxAvailable) {
             nextMode = CConfig::Mode::DOWNLOAD_CIA;
-            screen_begin_frame();
+            screen_begin_frame(true);
             setTextColor(COLOR_RED);
             renderText(0, 0, 1.0f, 1.0f, false,
                        "Kernel access not available.\nCan't enable Install modes.\nYou can only make a CIA.\n");

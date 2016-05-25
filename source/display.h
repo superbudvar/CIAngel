@@ -15,12 +15,14 @@ extern "C" {
 
 #define MAX_TEXTURES 1024
 #define TEXTURE_SCREEN_TOP_SPLASH_BG 0
-#define TEXTURE_APP_BANNER 1
-#define TEXTURE_FLAG_EUR 2
-#define TEXTURE_FLAG_USA 3
-#define TEXTURE_FLAG_JPN 4
-#define TEXTURE_FLAG_ALL 5
-#define TEXTURE_PROGRESS_BAR 6
+#define TEXTURE_SCREEN_TOP_BG 1
+#define APP_BANNER 2
+#define TEXTURE_PROGRESS_BAR 3
+#define TEXTURE_APP_BANNER 4
+#define TEXTURE_FLAG_EUR 5
+#define TEXTURE_FLAG_USA 6
+#define TEXTURE_FLAG_JPN 7
+#define TEXTURE_FLAG_ALL 8
 
 #define COLOR_BLACK 0xFF000000
 #define COLOR_BLUE 0xFFff0000
@@ -53,7 +55,7 @@ void renderText(float x, float y, float scaleX, float scaleY, bool baseline, con
 void setTextColor(u32 color);
 void sceneRenderFooter(const char *text);
 void screen_end_frame();
-void screen_begin_frame();
+void screen_begin_frame(bool with_bg);
 void sceneDraw();
 void renderBG();
 void screen_draw_texture(u32 id, float x, float y, float width, float height);

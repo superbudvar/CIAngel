@@ -133,7 +133,7 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
 	PrintConsole* currentConsole = consoleSelect(console);
 	consoleClear();
 
-    screen_begin_frame();
+    screen_begin_frame(true);
     setTextColor(COLOR_RED);
     renderText(0, 8, 1.0f, 1.0f, false, "Downloading...");
 	
@@ -160,14 +160,18 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
 	printf("\n");
     u32 pbarWidth = 0;
     u32 pbarHeight = 0;
+    double baroffset = 10.0f;
+    double barWidth = TOP_SCREEN_WIDTH - baroffset;
     screen_get_texture_size(&pbarWidth, &pbarHeight, TEXTURE_PROGRESS_BAR);
-    screen_draw_texture(TEXTURE_PROGRESS_BAR, 0, 120-(pbarHeight/2), (fPercent*4), pbarHeight);
+    screen_draw_texture(TEXTURE_PROGRESS_BAR, baroffset, 45, (fPercent* (barWidth/100)), pbarHeight/3);
 
 	// Output current progress
     char progress_text;
 	sprintf(&progress_text, "%0.2f / %0.2fMB  % 3.2f%%", ((double)nCurrent) / 1024 / 1024, ((double)nSize) / 1024 / 1024, fPercent);
+    setTextColor(COLOR_BLACK);
+    renderText(85, 44, 0.65f, 0.65f, false, &progress_text);
     setTextColor(COLOR_WHITE);
-    renderText(TOP_SCREEN_HEIGHT-30, 120, 0.7f, 0.7f, true, &progress_text);
+    renderText(84, 43, 0.65f, 0.65f, false, &progress_text);
 	printf("   %0.2f / %0.2fMB  % 3.2f%%\n", ((double)nCurrent) / 1024 / 1024, ((double)nSize) / 1024 / 1024, fPercent);
 
 	// Calculate download speed
@@ -668,7 +672,7 @@ bool check_JSON() {
       double age_days = age_seconds / (60 * 60 * 24);
 
       if (age_seconds > JSON_UPDATE_INTERVAL_IN_SECONDS) {
-        screen_begin_frame();
+        screen_begin_frame(true);
         char buf[255];
         sprintf(buf, "Your wings.json is %d days old\n\nPress A to update, or any other key to skip.\n", (int)age_days);
         setTextColor(COLOR_GREEN);
@@ -685,7 +689,7 @@ bool check_JSON() {
         return true;
       }
     } else {
-        screen_begin_frame();
+        screen_begin_frame(true);
         setTextColor(COLOR_GREEN);
         renderText(350,0, 0.4f, 0.4f, false, "No wings.json");
         screen_end_frame();

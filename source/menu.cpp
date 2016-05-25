@@ -99,7 +99,7 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
     while (!bExit && aptMainLoop()) {
         if (firstLoop || previous_index != current) {
             gspWaitForVBlank();
-            screen_begin_frame();
+            screen_begin_frame(true);
             firstLoop = false;
             int current_page = current / results_per_page;
             menu_offset = current_page * results_per_page;
@@ -213,7 +213,7 @@ void menu_multkey_draw(const char *title, const char *footer, int back, int coun
         }
 
         if (firstLoop || previous_index != current) {
-            screen_begin_frame();
+            screen_begin_frame(true);
             firstLoop = false;
             int current_page = current / results_per_page;
             menu_offset = current_page * results_per_page;
