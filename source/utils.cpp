@@ -638,7 +638,8 @@ void clear_screen(gfxScreen_t screen)
 		memset(buffer2, 0, (width * height * bpp));
 
     gfxFlushBuffers();
-    gfxSwapBuffers();
+//    gfxSwapBuffers();
+    gfxConfigScreen(screen, true);
     gspWaitForVBlank();
 }
 
