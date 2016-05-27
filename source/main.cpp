@@ -65,16 +65,16 @@ std::string getInput(std::string prompt, HB_Keyboard* sHBKB, bool &bCancelled)
     GSPGPU_FramebufferFormats format = gfxGetScreenFormat(GFX_BOTTOM);
     gfxSetScreenFormat(GFX_BOTTOM, GSP_BGR8_OES);
     clear_screen(GFX_BOTTOM);
+    // draw initial prompt
+    screen_begin_frame(true);
+    ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
+    screen_end_frame();
     sHBKB->HBKB_Clean();
     touchPosition touch;
     u8 KBState = 4;
     std::string input;
     std::string last_input;
                 
-    // draw initial prompt
-    screen_begin_frame(true);
-    ui_menu_draw_string(prompt.c_str(), 0, 0, 0.6f, COLOR_TITLE);
-    screen_end_frame();
     while (KBState != 1 || input.length() == 0)
     {
         if (!aptMainLoop())
@@ -275,10 +275,8 @@ bool search_by_serial(std::string &searchString, Json::Value &gameData, int &out
 /* Menu Action Functions */
 void action_search(bool (*match)(std::string &searchString, Json::Value &gameData, int &outScore))
 {
-    consoleClear();
-    
     if(sourceDataType == JSON_TYPE_NONE) {
-        printf("You can't fly without wings.\n\nPress any key to continue\n");
+        ui_printf("You can't fly without wings.\n\nPress any key to continue\n");
         wait_key();
         return;
     }
@@ -290,9 +288,6 @@ void action_search(bool (*match)(std::string &searchString, Json::Value &gameDat
     {
         return;
     }
-
-    // User has entered their input, so let's scrap the keyboard
-    clear_screen(GFX_BOTTOM);
 
     std::vector<game_item> display_output;
     int outScore;
@@ -346,7 +341,12 @@ void action_search(bool (*match)(std::string &searchString, Json::Value &gameDat
 
     if (display_amount == 0)
     {
-        printf("No matching titles found.\n");
+        screen_begin_frame(true);
+        setTextColor(COLOR_CYAN);
+        ui_printf("No matching titles found.\n");
+        setTextColor(COLOR_WHITE);
+        ui_printf ("\nPress A to return.\n");
+        screen_end_frame();
         wait_key_specific("\nPress A to return.\n", KEY_A);
         return;
     }

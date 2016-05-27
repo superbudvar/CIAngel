@@ -45,6 +45,7 @@ static C3D_RenderTarget *target_top;
 static C3D_RenderTarget *target_bottom;
 static textVertex_s *textVtxArray;
 static int textVtxArrayPos;
+static uiConsole top_console;
 static float fontSize = 0.5f;
 
 #define TEXT_VTX_ARRAY_COUNT (4 * 1024)
@@ -82,16 +83,19 @@ void screen_begin_frame(bool with_bg)
     C3D_FrameDrawOn(target_top);
     if(with_bg) {
        screen_draw_texture(TEXTURE_SCREEN_TOP_BG, 0, 0, TOP_SCREEN_WIDTH, TOP_SCREEN_HEIGHT);
-    }   
+    }  
+    top_console.cursorX = 0;
+    top_console.cursorY = 0;
 }
 
 void screen_end_frame() { C3D_FrameEnd(0); }
 
-void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char *text)
+void printfText(float *pos_x, float *pos_y, float scaleX, float scaleY, bool baseline, const char *text)
 {
     ssize_t units;
     uint32_t code;
-
+    float x = *pos_x;
+    float y = *pos_y;
     // Configure buffers
     C3D_BufInfo *bufInfo = C3D_GetBufInfo();
     BufInfo_Init(bufInfo);
@@ -140,6 +144,11 @@ void renderText(float x, float y, float scaleX, float scaleY, bool baseline, con
 //        uiConsole.cursorX = x;
 //        uiConsole.cursorY = y;
     } while (code > 0);
+}
+
+void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char *text)
+{
+    printfText(&x, &y, scaleX, scaleY, baseline, text);
 }
 
 void sceneRender(float size)
@@ -425,8 +434,8 @@ void sceneInit(void)
         printf("Failed to initialize the GPU.");
         return;
     }
-//    uiConsole.cursorX = 0;
-//    uiConsole.cursorY = 0;
+    top_console.cursorX = 0;
+    top_console.cursorY = 0;
     c3dInitialized = true;
 
     // Initialize the render target
@@ -504,7 +513,8 @@ void sceneInit(void)
     loadTextures();
 }
 
-//void ui_printf(std::string output) {
+void ui_printf(char *output) {
 //    uiConsole.buffer.append(output);
-//    renderText(0f, 0f, 0.5f, 0.5f, false, uiConsole.buffer);
-//}
+    //renderText(uiConsole.cursorX, uiConsole.cursorY, 0.5f, 0.5f, false, uiConsole.buffer);
+    printfText(&top_console.cursorX, &top_console.cursorY, 0.5f, 0.5f, false, output);
+}

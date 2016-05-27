@@ -40,18 +40,19 @@ extern "C" {
      GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
 #define FONT_DEFAULT_SIZE 0.5f
-/*
-typedef struct uiConsole {
+
+typedef struct {
     float cursorX;
     float cursorY;
-    std::string buffer;
+  //  std::string buffer;
     int rows;
 } uiConsole;
-*/
+
 void sceneInit(void);
 void sceneRender(float size);
 void sceneExit(void);
 void renderText(float x, float y, float scaleX, float scaleY, bool baseline, const char *text);
+void ui_printf(char *output);
 void setTextColor(u32 color);
 void sceneRenderFooter(const char *text);
 void screen_end_frame();
