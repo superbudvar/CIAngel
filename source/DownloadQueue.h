@@ -10,6 +10,7 @@
 #include "display.h"
 #include "utils2.h"
 #include "utils.h"
+#include "types.h"
 #include "ticket.h"
 #include "cia.h"
 
@@ -30,4 +31,4 @@ typedef struct {
 extern std::vector<game_item> game_queue;
 
 extern void ProcessGameQueue();
-extern Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string titleName);
+Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string titleName, std::string region);

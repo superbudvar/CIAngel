@@ -17,22 +17,34 @@ void CreateTicket(std::string titleId, std::string encTitleKey, char* titleVersi
     ofs.write(titleVersion, 0x2);
 
     //write title id
+    char* nTitleID = parse_string(titleId);
     ofs.seekp(tmd_top+0x9C, std::ios::beg);
-    ofs.write(parse_string(titleId), 0x8);
+    ofs.write(nTitleID, 0x8);
+    free(nTitleID);
 
     //write key
+    char* nTitleKey = parse_string(encTitleKey);
     ofs.seekp(tmd_top+0x7F, std::ios::beg);
-    ofs.write(parse_string(encTitleKey), 0x10);
+    ofs.write(nTitleKey, 0x10);
+    free(nTitleKey);
 
     ofs.close();
 }
 
-void InstallTicket(std::string FullPath)
+void InstallTicket(std::string FullPath, std::string TitleId)
 {
     Handle hTik;
     u32 writtenbyte;
-    AM_InstallTicketBegin(&hTik);
     std::string curr = get_file_contents(FullPath.c_str());
+
+    // Remove the ticket incase there was a bad one previously installed
+    char* nTitleId = parse_string(TitleId);
+    u64 titleId = u8_to_u64((u8*)nTitleId, BIG_ENDIAN);
+    free (nTitleId);
+    AM_DeleteTicket(titleId);
+
+    // Install new ticket
+    AM_InstallTicketBegin(&hTik);
     FSFILE_Write(hTik, &writtenbyte, 0, curr.c_str(), 0x100000, 0);
     AM_InstallTicketFinish(hTik);
     printf("Ticket Installed.");

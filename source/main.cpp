@@ -33,6 +33,7 @@
 #include "menu_settings.h"
 #include "utils.h"
 #include "data.h"
+#include "types.h"
 
 #include "common.h"
 #include "json/json.h"
@@ -211,6 +212,7 @@ bool menu_search_keypress(int selected, u32 key, void* data)
         std::string selected_titleid = (*cb_data)[selected].titleid;
         std::string selected_enckey = (*cb_data)[selected].titlekey;
         std::string selected_name = (*cb_data)[selected].ascii_name;
+        std::string selected_region = (*cb_data)[selected].region;
 
         printf("OK - %s\n", selected_name.c_str());
         //removes any problem chars, not sure if whitespace is a problem too...?
@@ -220,11 +222,11 @@ bool menu_search_keypress(int selected, u32 key, void* data)
         {
             char empty_titleVersion[2] = {0x00, 0x00};
             CreateTicket(selected_titleid, selected_enckey, empty_titleVersion, "/CIAngel/tmp/ticket");
-            InstallTicket("/CIAngel/tmp/ticket");
+            InstallTicket("/CIAngel/tmp/ticket", selected_titleid);
         }
         else
         {
-            DownloadTitle(selected_titleid, selected_enckey, selected_name);
+            DownloadTitle(selected_titleid, selected_enckey, selected_name, selected_region);
         }
 
         wait_key_specific("\nPress A to continue.\n", KEY_A);
@@ -470,7 +472,7 @@ void action_manual_entry()
         }
         if (titleId.length() == 16 && key.length() == 32)
         {
-            DownloadTitle(titleId, key, "");
+            DownloadTitle(titleId, key, "", "");
             wait_key_specific("\nPress A to continue.\n", KEY_A);
             break;
         }
@@ -507,7 +509,7 @@ void action_input_txt()
     input.open("/CIAngel/input.txt", std::ofstream::in);
     GetLine(input, titleId);
     GetLine(input, key);
-    DownloadTitle(titleId, key, "");
+    DownloadTitle(titleId, key, "", "");
 
     wait_key_specific("\nPress A to continue.\n", KEY_A);
 }
@@ -686,6 +688,7 @@ int main(int argc, const char* argv[])
     sslcInit(0);
     hidInit();
     acInit();
+    cfguInit();
 
     init_menu(GFX_BOTTOM);
 
@@ -713,6 +716,7 @@ int main(int argc, const char* argv[])
 
     sceneExit();
     C3D_Fini();
+    cfguExit();
     acExit();
     gfxExit();
     hidExit();
