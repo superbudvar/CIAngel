@@ -148,7 +148,15 @@ Result DownloadTitle(std::string titleId, std::string encTitleKey, std::string t
     res = ProcessCIA(outputDir + "/tmp", titleName);
     if (res != 0)
     {
-        printf("Could not %s the CIA.\n", mode_text.c_str());
+        char error[50];
+        sprintf(error, "Could not %s the CIA.\n", mode_text.c_str());
+        screen_begin_frame(true);
+        printf(error);
+        setTextColor(COLOR_DEFAULT);
+        ui_printf(error);
+        setTextColor(COLOR_PROMPT);
+        ui_printf("\nPress A to continue\n");
+        screen_end_frame();
         return res;
     }
 

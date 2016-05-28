@@ -33,6 +33,8 @@ extern "C" {
 #define COLOR_CYAN 0xFFd19426
 
 #define CLEAR_COLOR 0x00000000
+#define COLOR_DEFAULT COLOR_WHITE
+#define COLOR_PROMPT COLOR_PURPLE
 
 #define DISPLAY_TRANSFER_FLAGS                                                                                                     \
     (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) |                                               \

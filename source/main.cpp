@@ -407,8 +407,6 @@ bool menu_queue_keypress(int selected, u32 key, void* data)
 
 void action_prompt_queue()
 {
-    consoleClear();
-
     std::string mode_text;
     switch (config.GetMode())
     {
@@ -428,7 +426,6 @@ void action_prompt_queue()
     sprintf(header, "Queue contains %d items.\n", game_queue.size());
     sprintf(footer, "A: %s queue  X: clear B: return", mode_text.c_str());
     titles_multkey_draw(header, footer, 0, &game_queue, NULL, menu_queue_keypress);
-
 }
 
 void action_manual_entry()
@@ -517,7 +514,6 @@ void action_input_txt()
 
 void action_about()
 {
-    consoleClear();
     screen_begin_frame(true);
     setTextColor(COLOR_RED);
     renderText(0, 2, 1.0f, 1.0f, false, "CIAngel\n");
@@ -525,12 +521,13 @@ void action_about()
     renderText(0, 32, 0.6f, 0.6f, false, "Download, create and install CIAs directly from\nNintendo's CDN servers. Grabbing the latest games\nhas never been so easy.\n");
     renderText(0, 102, 0.6f, 0.6f, false, "Contributors: Cearp, Drakia, superbudvar,");
     renderText(120, 120, 0.6f, 0.6f, false, "mysamdog, cerea1killer");
-    char revision_line;
-    sprintf(&revision_line, "Commit: %s", REVISION_STRING);
-    renderText(0, 220 , 0.6f, 0.6f, false, &revision_line);
+    char revision_line[10];
+    sprintf(revision_line, "Commit: %s", REVISION_STRING);
+    renderText(0, 220 , 0.6f, 0.6f, false, revision_line);
     renderText(0, 200, 0.6f, 0.6f, false, "Press any button to continue.");
     screen_end_frame();
     
+    consoleClear();
     printf(CONSOLE_RED "CIAngel\n\n" CONSOLE_RESET);
     printf("Download, create and install CIAs\n");
     printf("directly from Nintendo's CDN servers.\n");
@@ -669,17 +666,17 @@ int main(int argc, const char* argv[])
     screen_end_frame();
     // Sadly svchax crashes too much, so only allow install mode when running as a CIA
     // Trigger svchax so we can install CIAs
-    if(argc > 0) {
+    /*if(argc > 0) {
         action_enable_svchax();
         if(!bSvcHaxAvailable) {
             printf("Failed to acquire kernel access. Install mode disabled.\n");
         }
-    }
+    }*/
     
     // argc is 0 when running as a CIA, and 1 when running as a 3dsx
     if (argc > 0)
     {
-   //     bSvcHaxAvailable = false;
+        bSvcHaxAvailable = false;
     }
 
     u32 *soc_sharedmem, soc_sharedmem_size = 0x100000;

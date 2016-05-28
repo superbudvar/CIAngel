@@ -98,7 +98,6 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
 
     while (!bExit && aptMainLoop()) {
         if (firstLoop || previous_index != current) {
-            gspWaitForVBlank();
             screen_begin_frame(true);
             firstLoop = false;
             int current_page = current / results_per_page;
@@ -136,8 +135,8 @@ void titles_multkey_draw(const char *title, const char* footer, int back, std::v
                     current_pos_y++;
                 }
                 consoleClear();
+                menu_draw_info(infoConsole, (*options)[current]);
             }
-            menu_draw_info(infoConsole, (*options)[current]);
             if (footer != NULL) {
                 // Draw the footer if one is provided
                 current_pos_y = currentMenu.menuConsole.consoleHeight - 1;

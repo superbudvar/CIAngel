@@ -161,9 +161,9 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
     u32 pbarWidth = 0;
     u32 pbarHeight = 0;
     double baroffset = 10.0f;
-    double barWidth = TOP_SCREEN_WIDTH - baroffset;
+    double barWidth = TOP_SCREEN_WIDTH - (2* baroffset);
     screen_get_texture_size(&pbarWidth, &pbarHeight, TEXTURE_PROGRESS_BAR);
-    screen_draw_texture(TEXTURE_PROGRESS_BAR, baroffset, 45, (fPercent* (barWidth/100)), pbarHeight/3);
+    screen_draw_texture(TEXTURE_PROGRESS_BAR, baroffset, 45, fPercent* (barWidth/100), pbarHeight/3);
 
 	// Output current progress
     char progress_text;
@@ -186,7 +186,7 @@ void PrintProgress(PrintConsole *console, u32 nSize, u32 nCurrent)
             char speed_text;
 			sprintf(&speed_text, "Avg Speed: %.02f KB/s", speed);
 			printf("   Avg Speed: %.02f KB/s\n", speed);
-            renderText(0, 220, 0.7f, 0.7f, true, &speed_text);
+            renderText(0, 230, 0.7f, 0.7f, true, &speed_text);
 		}
 	}
 
